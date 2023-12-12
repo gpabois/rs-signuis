@@ -1,10 +1,10 @@
-use chrono::{Utc, DurationRound, Duration};
-use sea_query::{Query, PostgresQueryBuilder};
+use chrono::{Utc, Duration};
+use sea_query::{Query, PostgresQueryBuilder, CommonTableExpression, Alias, Expr};
 use sea_query_binder::SqlxBinder;
-use sqlx::{Pool, Postgres, Row};
+use sqlx::{Pool, Postgres, Row, FromRow};
 use async_trait::async_trait;
 
-use crate::{Error, model::{session::Session, user::{User, UserFilter}, auth::Credentials}, sql::{UserIden, SessionIden}, utils::generate_token};
+use crate::{Error, model::{session::Session, user::UserFilter, auth::Credentials}, sql::{UserIden, SessionIden}, utils::generate_token};
 
 use super::account::filter_user;
 
@@ -86,33 +86,19 @@ impl IAuthentication for Authentication {
         }
 
         let row = result.unwrap();
-        
-        let session = Session {
-            id: row.get("session_id"),
-            ip: row.get("session_ip"),
-            user: row.get::<Option<String>, &str>("user_id").map(|_| {
-                return User {
-                    id: row.get("user_id"),
-                    name: row.get("user_name"),
-                    email: row.get("user_email"),
-                    avatar: row.get("user_avatar")
-                }
-            })
-        };
-
-        return Result::Ok(Option::Some(session));
+        return Result::Ok(Option::Some(Session::from_row(&row)?));
 
     }
 
     async fn get_session_by_ip(&self, ip: &String) -> Result<Session, Error> {
-        let result: Option<(String, String)> = sqlx::query_as("SELECT id, ip FROM Session as t0 WHERE t0.ip=?")
+        let result= sqlx::query("SELECT id, user_id, ip FROM Session as t0 WHERE t0.ip=?")
             .bind(ip)
             .fetch_optional(&self.pool)
             .await?;
 
         if result.is_some() {
             let row = result.unwrap();
-            return Result::Ok(Session::from_ip(row));
+            return Result::Ok(Session::from_row(&row)?);
         }   
 
         return self.create_session_by_ip(ip).await;
@@ -124,31 +110,67 @@ impl Authentication {
         let token = generate_token(16);
 
         let mut expires_at = Utc::now().checked_add_signed(Duration::hours(8)).unwrap();
-        let mut qb = Query::insert();
         
-        let (sql, arguments) = qb
-        .into_table(SessionIden::Table)
-        .columns([
-            SessionIden::UserID,
-            SessionIden::IP,
-            SessionIden::Token,
-            SessionIden::ExpiresAt
-        ]).values([
-            user_id.into(),
-            ip.into(),
-            token.into(),
-            expires_at.into()
-        ]).build_sqlx(PostgresQueryBuilder);
+        let (sql, arguments) = Query::with().cte(
+            CommonTableExpression::new()
+                .table_name(Alias::new("inserted_report"))
+                .query(Query::insert()
+                        .into_table(SessionIden::Table)
+                        .columns([
+                            SessionIden::UserID,
+                            SessionIden::IP,
+                            SessionIden::Token,
+                            SessionIden::ExpiresAt
+                        ]).values([
+                            user_id.into(),
+                            ip.into(),
+                            token.into(),
+                            expires_at.into()
+                        ])
+                        .expect("Cannot bind values")
+                        .returning(Query::returning()
+                            .columns([
+                                SessionIden::ID, 
+                                SessionIden::UserID, 
+                                SessionIden::IP
+                            ])
+                        )
+                        .to_owned()
+                ).to_owned()
+        ).query(
+            Query::select()
+                .from(Alias::new("inserted_report"))
+                .left_join(UserIden::Table, Expr::col((UserIden::Table, UserIden::ID)).equals(Alias::new("id")))
+                .exprs([
+                    Expr::col(SessionIden::ID).as_enum(Alias::new("session_id")),
+                    Expr::col(SessionIden::IP).as_enum(Alias::new("session_ip")),
+                    Expr::col(UserIden::ID).as_enum(Alias::new("user_id")),
+                    Expr::col(UserIden::Name).as_enum(Alias::new("user_name")),
+                    Expr::col(UserIden::Email).as_enum(Alias::new("user_email")),
+                    Expr::col(UserIden::Avatar).as_enum(Alias::new("user_avatar")),
+                ])
+                .to_owned()
+        ).build_sqlx(PostgresQueryBuilder);
         
-
+        let row = sqlx::query_with(&sql, arguments).fetch_one(&self.pool).await?;
+        return Result::Ok(Session::from_row(&row)?);
     }
+    
     /// Create a session based on the IP
     async fn create_session_by_ip(&self, ip: &String) -> Result<Session, Error> {
-        let row: (String, String) = sqlx::query_as("INSERT INTO Session (ip) VALUES (?) RETURNING (id, ip)")
-        .bind(ip)
-        .fetch_one(&self.pool)
-        .await?;
+        let (sql, arguments) = Query::insert()
+            .into_table(SessionIden::Table)
+            .columns([SessionIden::IP])
+            .values([ip.into()])
+            .expect("cannot bind values")
+            .returning(Query::returning().columns([SessionIden::ID, SessionIden::UserID, SessionIden::IP]))
+            .to_owned()
+            .build_sqlx(PostgresQueryBuilder);
 
-        return Result::Ok(Session::from_ip(row));
+        let row = sqlx::query_with(&sql, arguments)
+            .fetch_one(&self.pool)
+            .await?;
+
+        return Result::Ok(Session::from_row(&row)?);
     }
 }

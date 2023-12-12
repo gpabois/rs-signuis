@@ -12,7 +12,7 @@ base64 = "0.21.5"
 chrono = "0.4.31"
 password-hash = "0.5.0"
 rand = "0.8.5"
-sea-query = { version = "0.30.4", features = ["with-chrono", "with-time"] }
+sea-query = { version = "0.30.4", features = [] }
 sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres"] }
 sea-query-postgres = "0.4.0"
 sqlx = { version = "0.7.3", features = ["postgres"] }

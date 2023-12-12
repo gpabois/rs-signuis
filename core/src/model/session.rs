@@ -1,3 +1,5 @@
+use sqlx::{FromRow, postgres::PgRow, Row};
+
 use super::user::User;
 
 
@@ -7,12 +9,19 @@ pub struct Session {
     pub ip:     String
 }
 
-impl Session {
-    pub fn from_ip(data: (String, String)) -> Self {
-        return Session {
-            id: data.0,
-            ip: data.1,
-            user: Option::None
-        }
+impl<'r> FromRow<'r, PgRow> for Session {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Result::Ok(Session {
+            id: row.try_get("session_id")?,
+            ip: row.try_get("session_ip")?,
+            user: row.try_get::<Option<String>, &str>("user_id")?.map(|_| {
+                return User {
+                    id: row.get("user_id"),
+                    name: row.get("user_name"),
+                    email: row.get("user_email"),
+                    avatar: row.get("user_avatar")
+                }
+            })
+        })
     }
 }
