@@ -1,5 +1,7 @@
+mod database;
 mod account;
 mod authentication;
 
-pub use authentication::Authentication;
-pub use account::Account;
+pub use database::*;
+pub use authentication::*;
+pub use account::*;

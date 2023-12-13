@@ -2,7 +2,6 @@ use sqlx::{FromRow, postgres::PgRow, Row};
 
 use super::user::User;
 
-
 pub struct Session {
     pub id:     String,
     pub user:   Option<User>,

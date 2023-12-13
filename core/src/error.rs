@@ -1,4 +1,4 @@
-// Inspired by Zod
+#[derive(Debug)]
 pub struct Issue {
     pub path: Vec<String>,
     pub code: String,
@@ -28,7 +28,9 @@ impl Into<Vec<Issue>> for IssueBuilder {
     }
 }
 
+#[derive(Debug)]
 pub enum Error {
+    MigrationError(String),
     DatabaseError(String),
     ValidationError(Vec<Issue>),
     InvalidCredentials
@@ -47,6 +49,12 @@ impl<D> Into<Result<D, Error>> for Error {
     fn into(self) -> Result<D, Error> {
         Result::Err(self)
     }
+}
+
+impl From<sqlx::migrate::MigrateError> for Error {
+    fn from(value: sqlx::migrate::MigrateError) -> Self {
+        Self::MigrationError(value.to_string())
+    } 
 }
 
 impl From<sqlx::Error> for Error {

@@ -1,0 +1,14 @@
+syntax = "proto3";
+package signuis;
+
+service Authentication {
+    rpc check_token (CheckTokenRequest) returns (CheckTokenResult);
+};
+
+message CheckTokenRequest {
+    string token = 1;
+}
+
+message CheckTokenResult {
+    bool ok = 1;
+}
