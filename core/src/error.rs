@@ -1,3 +1,5 @@
+use sqlx::migrate::MigrateError;
+
 #[derive(Debug)]
 pub struct Issue {
     pub path: Vec<String>,
@@ -30,8 +32,9 @@ impl Into<Vec<Issue>> for IssueBuilder {
 
 #[derive(Debug)]
 pub enum Error {
-    MigrationError(String),
-    DatabaseError(String),
+    MissingEnv(String),
+    MigrationError(MigrateError),
+    DatabaseError(sqlx::Error),
     ValidationError(Vec<Issue>),
     InvalidCredentials
 }
@@ -40,8 +43,11 @@ impl Error {
     pub fn invalid_credentials() -> Self {
         return Self::InvalidCredentials;
     }
-    pub fn validator_error<T: Into<Vec<Issue>>>(issues: T) -> Self {
+    pub fn validation_error<T: Into<Vec<Issue>>>(issues: T) -> Self {
         return Self::ValidationError(issues.into())
+    }
+    pub fn missing_env<S: Into<String>>(value: S) -> Self {
+        return Self::MissingEnv(value.into());
     }
 }
 
@@ -53,12 +59,12 @@ impl<D> Into<Result<D, Error>> for Error {
 
 impl From<sqlx::migrate::MigrateError> for Error {
     fn from(value: sqlx::migrate::MigrateError) -> Self {
-        Self::MigrationError(value.to_string())
+        Self::MigrationError(value)
     } 
 }
 
 impl From<sqlx::Error> for Error {
     fn from(value: sqlx::Error) -> Self {
-        Self::DatabaseError(value.to_string())
+        Self::DatabaseError(value)
     }
 }

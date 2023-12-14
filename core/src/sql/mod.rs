@@ -6,19 +6,19 @@ pub enum SessionIden {
     UserID,
     Token,
     IP,
-    CreatedAt,
+    //CreatedAt,
     ExpiresAt
 }
 
 impl Iden for SessionIden {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
         write!(s, "{}", match self {
-            Self::Table => "Session",
+            Self::Table => "sessions",
             Self::ID => "id",
             Self::UserID => "user_id",
             Self::Token => "token",
             Self::IP => "ip",
-            Self::CreatedAt => "created_at",
+            //Self::CreatedAt => "created_at",
             Self::ExpiresAt => "expires_at"
         }).unwrap();
     }
@@ -36,7 +36,7 @@ pub enum UserIden {
 impl Iden for UserIden {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
         write!(s, "{}", match self {
-            Self::Table => "User",
+            Self::Table => "users",
             Self::ID => "id",
             Self::Name => "name",
             Self::Email => "email",

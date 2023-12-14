@@ -3,22 +3,30 @@ use async_trait::async_trait;
 
 use crate::{Error, model::{session::Session, auth::{Credentials, StoredCredentials}}};
 
-#[async_trait]
-pub trait IAuthentication {
-    /// Verify the token
-    async fn check_token(self, token: String) -> Result<Option<Session>, Error>;
-    /// Get a session by an IP, creates one if does not exist.
-    async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error>;
-    /// Check credentials, and creates a session
-    async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error>;
+pub mod traits {
+    use sqlx::{Postgres, Row, FromRow, Executor};
+    use async_trait::async_trait;
+
+    use crate::{Error, model::{session::Session, auth::{Credentials, StoredCredentials}}};
+
+    #[async_trait]
+    pub trait Authentication {
+        /// Verify the token
+        async fn check_token(self, token: String) -> Result<Option<Session>, Error>;
+        /// Get a session by an IP, creates one if does not exist.
+        async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error>;
+        /// Check credentials, and creates a session
+        async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error>;
+    }
 }
+
 
 pub struct AuthenticationArgs<A> {
     db: A
 }
 
 impl<A> AuthenticationArgs<A>{
-    fn new(db: A) -> Self {
+    pub fn new(db: A) -> Self {
         Self{db}
     }
 }
@@ -109,7 +117,33 @@ mod sql_query {
 }
 
 #[async_trait]
-impl<'c, A> IAuthentication for &'_ Authentication<A> 
+impl<'c, A> traits::Authentication for Authentication<A> 
+    where A: Executor<'c, Database = Postgres> + std::marker::Send + std::marker::Sync + Copy
+{
+    async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
+        let user_id: String = check_credentials(self.db, credentials).await?;
+        let session = create_session_by_user(self.db, user_id, ip).await?;
+
+        return Result::Ok(session);
+    }
+    
+    async fn check_token(self, token: String) -> Result<Option<Session>, Error> {
+        return check_token(self.db, token).await;
+    }
+
+    async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error> {
+        let result = find_session_by_ip(self.db, ip).await?;
+
+        if result.is_some() {
+            return Result::Ok(result.unwrap())
+        }
+
+        return create_session_by_ip(self.db, ip).await;
+    }
+}
+
+#[async_trait]
+impl<'c, A> traits::Authentication for &'_ Authentication<A> 
     where for <'a> &'a A: Executor<'c, Database = Postgres> + std::marker::Send + std::marker::Sync, A : std::marker::Send + std::marker::Sync
 {
     async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
@@ -135,8 +169,8 @@ impl<'c, A> IAuthentication for &'_ Authentication<A>
 }
 
 #[async_trait]
-impl<'c, A> IAuthentication for &'_ mut Authentication<A> 
-    where for<'a> &'a mut A: Executor<'c, Database = Postgres>, A : std::marker::Send {
+impl<'c, A> traits::Authentication for &'c mut Authentication<A> 
+    where for<'a> &'a mut A: Executor<'c, Database = Postgres>, A: std::marker::Send {
     async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
         let user_id: String = check_credentials(&mut self.db, credentials).await?;
         let session = create_session_by_user(&mut self.db, user_id, ip).await?;

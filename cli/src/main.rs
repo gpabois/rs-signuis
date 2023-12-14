@@ -1,7 +1,8 @@
-use signuis_core::{services::{Database, DatabaseArgs}, config::{Config, ConfigArgs}};
+use signuis_core::{services::{Database, DatabaseArgs, IDatabase, DatabasePool}, config::{Config, ConfigArgs}, Error};
+use signuis_core::log::{info, error};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     let cmd = clap::Command::new("signuis-cli")
         .bin_name("signuis-cli")
         .subcommand_required(true)
@@ -10,29 +11,41 @@ async fn main() {
 
     let matches = cmd.get_matches();
 
-    match matches.subcommand() {
+    let result = match matches.subcommand() {
         Some(("db:migrate", _)) => {
-            migrate_database().await;
+            migrate_database().await
         },
-        Some(("db::revert", _)) => {
-            revert_database().await;
+        Some(("db:revert", _)) => {
+            revert_database().await
         },
         _ => unreachable!("invalid command")
     };
+
+    if result.is_err() {
+        error!(target: "signuis::cli", "{:?}", result.unwrap_err());
+    }
+
+    Result::Ok(())
 }
 
 /// Migrate the database
-async fn migrate_database() {
-    Config::init(ConfigArgs::Default());
-    let database_url = Config::get_database_url().expect("missing 'DATABASE_URL' environment variable");
-    let db = Database::new(DatabaseArgs::new(database_url.as_str())).await.unwrap();
-    db.migrate().await.unwrap();
+async fn migrate_database() -> Result<(), Error> {
+    Config::init(ConfigArgs::default());
+    let database_url = Config::try_get_database_url()?;
+    info!(target: "signuis::cli", "Migrating...");
+    let db = DatabasePool::new(DatabaseArgs::new(database_url.as_str())).await?;
+    db.migrate().await?;
+    info!(target: "signuis::cli", "done !");
+    Result::Ok(())
 }
 
-/// revert the database
-async fn revert_database() {
-    Config::init(ConfigArgs::Default());
-    let database_url = Config::get_database_url().expect("missing 'DATABASE_URL' environment variable");
-    let db = Database::new(DatabaseArgs::new(database_url.as_str())).await.unwrap();
-    db.revert().await.unwrap();
+/// Revert the database
+async fn revert_database() -> Result<(), Error> {
+    Config::init(ConfigArgs::default());
+    let database_url = Config::try_get_database_url()?;
+    info!(target: "signuis::cli", "Reverting...");
+    let db = DatabasePool::new(DatabaseArgs::new(database_url.as_str())).await?;
+    db.revert().await?;
+    info!(target: "signuis::cli", "done !");
+    Result::Ok(())
 }
