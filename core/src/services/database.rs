@@ -8,7 +8,7 @@ use sqlx::{Postgres, Pool, Executor, Acquire, Transaction};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::migrate::{Migrator, MigrateError};
 use futures::stream::BoxStream;
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, LocalBoxFuture};
 
 use crate::Error;
 
@@ -26,14 +26,12 @@ pub type DatabasePool = Database<Pool<Postgres>>;
 pub type DatabaseTx<'c> = Database<Transaction<'c, Postgres>>;
 
 pub mod traits {
-    use futures::future::BoxFuture;
+    use futures::future::LocalBoxFuture;
     use sqlx::migrate::MigrateError;
 
-    use crate::futures::BoxedFuture;
-
     pub trait Database<'c> {
-        fn migrate(self) -> BoxFuture<'c, Result<(), MigrateError>>;
-        fn revert(self) -> BoxFuture<'c, Result<(), MigrateError>>;
+        fn migrate(self) -> LocalBoxFuture<'c, Result<(), MigrateError>>;
+        fn revert(self) -> LocalBoxFuture<'c, Result<(), MigrateError>>;
     }
 }
 
@@ -67,14 +65,13 @@ impl<'c> DatabaseTx<'c> {
 }
 
 impl<'c, C> traits::Database<'c> for &'c Database<C> 
-    where &'c C: Acquire<'c, Database = Postgres>, 
-            C: std::marker::Send + std::marker::Sync + 'c
+    where &'c C: Acquire<'c, Database = Postgres> + std::marker::Send
 {
-    fn revert(self) -> BoxFuture<'c, Result<(), MigrateError>> {
+    fn revert(self) -> LocalBoxFuture<'c, Result<(), MigrateError>> {
        Box::pin(MIGRATOR.undo(&self.executor, -1))
     }
 
-    fn migrate(self) -> BoxFuture<'c, Result<(), MigrateError>>  {
+    fn migrate(self) -> LocalBoxFuture<'c, Result<(), MigrateError>>  {
         Box::pin(MIGRATOR.run(&self.executor))
     }
 }
@@ -82,11 +79,11 @@ impl<'c, C> traits::Database<'c> for &'c Database<C>
 impl<'c, C> traits::Database<'c> for &'c mut Database<C> 
     where &'c mut C: Acquire<'c, Database = Postgres> , C: std::marker::Send + std::marker::Sync + 'c 
 {
-    fn revert(self) -> BoxFuture<'c, Result<(), MigrateError>> {
+    fn revert(self) -> LocalBoxFuture<'c, Result<(), MigrateError>> {
         Box::pin(MIGRATOR.undo(&mut self.executor, -1))
     }
 
-    fn migrate(self) -> BoxFuture<'c, Result<(), MigrateError>> {
+    fn migrate(self) -> LocalBoxFuture<'c, Result<(), MigrateError>> {
         Box::pin(MIGRATOR.run(&mut self.executor))
     }
 }
