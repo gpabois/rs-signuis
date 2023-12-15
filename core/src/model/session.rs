@@ -1,4 +1,4 @@
-use sqlx::{FromRow, postgres::PgRow, Row};
+use sqlx::{FromRow, Row};
 
 use super::user::User;
 
@@ -8,8 +8,8 @@ pub struct Session {
     pub ip:     String
 }
 
-impl<'r> FromRow<'r, PgRow> for Session {
-    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+impl<'r, R> FromRow<'r, R> for Session where R: Row {
+    fn from_row(row: &'r R) -> Result<Self, sqlx::Error> {
         Result::Ok(Session {
             id: row.try_get("session_id")?,
             ip: row.try_get("session_ip")?,

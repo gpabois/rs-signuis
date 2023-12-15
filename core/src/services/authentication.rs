@@ -1,13 +1,12 @@
-use sqlx::{Postgres, Row, FromRow, Executor};
+use sqlx::{Row, FromRow, Executor, Acquire};
 use async_trait::async_trait;
 
 use crate::{Error, model::{session::Session, auth::{Credentials, StoredCredentials}}};
 
 pub mod traits {
-    use sqlx::{Postgres, Row, FromRow, Executor};
     use async_trait::async_trait;
 
-    use crate::{Error, model::{session::Session, auth::{Credentials, StoredCredentials}}};
+    use crate::{Error, model::{session::Session, auth::Credentials}};
 
     #[async_trait]
     pub trait Authentication {
@@ -33,6 +32,14 @@ impl<A> AuthenticationArgs<A>{
 
 pub struct Authentication<A> {
     db: A
+}
+
+impl<A> Authentication<A> {
+    pub fn new(args: AuthenticationArgs<A>) -> Self {
+        Self {
+            db: args.db
+        }
+    }
 }
 
 mod sql_query {
@@ -117,18 +124,19 @@ mod sql_query {
 }
 
 #[async_trait]
-impl<'c, A> traits::Authentication for Authentication<A> 
-    where A: Executor<'c, Database = Postgres> + std::marker::Send + std::marker::Sync + Copy
-{
+impl<'c, E> traits::Authentication for &'_ Authentication<E> where for<'a> &'a E: Acquire<'c> {
     async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
-        let user_id: String = check_credentials(self.db, credentials).await?;
-        let session = create_session_by_user(self.db, user_id, ip).await?;
+        let mut conn = self.db.acquire().await?;
+        
+        let user_id: String = check_credentials(&mut conn, credentials).await?;
+        let session = create_session_by_user(&mut conn, user_id, ip).await?;
 
         return Result::Ok(session);
     }
     
     async fn check_token(self, token: String) -> Result<Option<Session>, Error> {
-        return check_token(self.db, token).await;
+        let mut conn = self.db.acquire().await?;
+        return check_token(&mut conn, token).await;
     }
 
     async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error> {
@@ -143,83 +151,35 @@ impl<'c, A> traits::Authentication for Authentication<A>
 }
 
 #[async_trait]
-impl<'c, A> traits::Authentication for &'_ Authentication<A> 
-    where for <'a> &'a A: Executor<'c, Database = Postgres> + std::marker::Send + std::marker::Sync, A : std::marker::Send + std::marker::Sync
+impl<'c, E> traits::Authentication for &'_ mut Authentication<E> where for<'a> &'a mut E: Acquire<'c> 
 {
     async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
-        let user_id: String = check_credentials(&self.db, credentials).await?;
-        let session = create_session_by_user(&self.db, user_id, ip).await?;
+        let mut conn = self.db.acquire().await?;
+        let user_id: String = check_credentials(&mut conn, credentials).await?;
+        let session = create_session_by_user(&mut conn, user_id, ip).await?;
 
         return Result::Ok(session);
     }
     
     async fn check_token(self, token: String) -> Result<Option<Session>, Error> {
-        return check_token(&self.db, token).await;
+        let mut conn = self.db.acquire().await?;
+        return check_token(&mut conn, token).await;
     }
 
     async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error> {
-        let result = find_session_by_ip(&self.db, ip).await?;
+        let mut conn = self.db.acquire().await?;
+        let result = find_session_by_ip(&mut conn, ip).await?;
 
         if result.is_some() {
             return Result::Ok(result.unwrap())
         }
 
-        return create_session_by_ip(&self.db, ip).await;
+        return create_session_by_ip(&mut conn, ip).await;
     }
-}
-
-#[async_trait]
-impl<'c, A> traits::Authentication for &'c mut Authentication<A> 
-    where for<'a> &'a mut A: Executor<'c, Database = Postgres>, A: std::marker::Send {
-    async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
-        let user_id: String = check_credentials(&mut self.db, credentials).await?;
-        let session = create_session_by_user(&mut self.db, user_id, ip).await?;
-
-        return Result::Ok(session);
-    }
-    
-    async fn check_token(self, token: String) -> Result<Option<Session>, Error> {
-        return check_token(&mut self.db, token).await;
-    }
-
-    async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error> {
-        let result = find_session_by_ip(&mut self.db, ip).await?;
-
-        if result.is_some() {
-            return Result::Ok(result.unwrap())
-        }
-
-        return create_session_by_ip(&mut self.db, ip).await;
-    }
-}
-
-async fn check_token<'c, E: Executor<'c, Database = Postgres>>(executor: E, token: String) -> Result<Option<Session>, Error> {
-    let result = sqlx::query("
-            SELECT 
-                t0.id       AS session_id, 
-                t0.ip       AS session_ip,
-                t1.id       AS user_id, 
-                t1.name     AS user_name, 
-                t1.email    AS user_email,
-                t1.avatar   AS user_avatar,
-            FROM Session as t0
-            LEFT JOIN User AS t1 ON t1.id == t0.user_id
-            WHERE t0.token = ? AND t0.expires_at > NOW()
-        ")
-    .bind(token)
-    .fetch_optional(executor)
-    .await?;
-
-    if result.is_none() {
-        return Result::Ok(Option::None);
-    }
-
-    let row = result.unwrap();
-    return Result::Ok(Option::Some(Session::from_row(&row)?));
 }
 
 // Check the credentials, returns the user id on success
-async fn check_credentials<'c, E: Executor<'c, Database = Postgres>>(executor: E, credentials: Credentials) -> Result<String, Error> {
+async fn check_credentials<'c, E: Executor<'c>>(executor: E, credentials: Credentials) -> Result<String, Error> {
     //
     let stored_opt = get_stored_credentials(executor, credentials.name_or_email).await?;
 
@@ -239,7 +199,7 @@ async fn check_credentials<'c, E: Executor<'c, Database = Postgres>>(executor: E
 }
 
 /// Get stored credentials
-async fn get_stored_credentials<'c, E: Executor<'c, Database = Postgres>>(executor: E, name_or_email: String) -> Result<Option<StoredCredentials>, Error> {
+async fn get_stored_credentials<'c, E: Executor<'c>>(executor: E, name_or_email: String) -> Result<Option<StoredCredentials>, Error> {
     let (sql, arguments) = sql_query::check_credentials_query(&name_or_email);
 
     let result = sqlx::query_with(&sql, arguments)
@@ -259,7 +219,7 @@ async fn get_stored_credentials<'c, E: Executor<'c, Database = Postgres>>(execut
 }
 
 /// Find a session by its ip
-async fn find_session_by_ip<'c, E: Executor<'c, Database = Postgres>>(executor: E, ip: &str) -> Result<Option<Session>, Error> {
+async fn find_session_by_ip<'c, E: Executor<'c>>(executor: E, ip: &str) -> Result<Option<Session>, Error> {
     let result= sqlx::query("SELECT id, user_id, ip FROM Session as t0 WHERE t0.ip=?")
     .bind(ip)
     .fetch_optional(executor)
@@ -274,14 +234,14 @@ async fn find_session_by_ip<'c, E: Executor<'c, Database = Postgres>>(executor: 
 }
 
 /// Create a user session
-async fn create_session_by_user<'c, E: Executor<'c, Database = Postgres>>(executor: E, user_id: String, ip: String) -> Result<Session, Error> {
+async fn create_session_by_user<'c, E: Executor<'c>>(executor: E, user_id: String, ip: String) -> Result<Session, Error> {
     let (sql, arguments) = sql_query::create_session_by_user_query(user_id, ip);
     let row = sqlx::query_with(&sql, arguments).fetch_one(executor).await?;
     return Result::Ok(Session::from_row(&row)?);
 }
 
 /// Create an anonymous session
-async fn create_session_by_ip<'c, E: Executor<'c, Database = Postgres>>(executor: E, ip: &String) -> Result<Session, Error> {
+async fn create_session_by_ip<'c, E: Executor<'c>>(executor: E, ip: &String) -> Result<Session, Error> {
     let (sql, arguments) = sql_query::create_session_by_ip_query(ip);
 
     let row = sqlx::query_with(&sql, arguments)
@@ -291,10 +251,3 @@ async fn create_session_by_ip<'c, E: Executor<'c, Database = Postgres>>(executor
     return Result::Ok(Session::from_row(&row)?);
 }
 
-impl<A> Authentication<A> {
-    pub fn new(args: AuthenticationArgs<A>) -> Self {
-        Self {
-            db: args.db
-        }
-    }
-}
