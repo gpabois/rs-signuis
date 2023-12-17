@@ -36,7 +36,8 @@ pub enum Error {
     MigrationError(MigrateError),
     DatabaseError(sqlx::Error),
     ValidationError(Vec<Issue>),
-    InvalidCredentials
+    InvalidCredentials,
+    InvalidTokenSession
 }
 
 impl Error {

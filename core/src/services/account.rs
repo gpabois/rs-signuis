@@ -1,28 +1,83 @@
-use argon2::Argon2;
-use password_hash::{PasswordHash, SaltString};
-use sqlx::{Postgres, Pool, Row};
-use sea_query::{Query, SelectStatement, Cond, Expr, PostgresQueryBuilder, Alias};
-use sea_query_binder::SqlxBinder;
+use futures::future::BoxFuture;
+use sqlx::{Postgres, Row, Executor, FromRow};
 
-use crate::{model::user::{RegisterUser, User, UserFilter}, Error, sql::UserIden};
+use crate::{model::user::{RegisterUser, User, UserFilter}, Error};
+
+pub mod traits {
+    use futures::future::BoxFuture;
+
+    use crate::{model::user::{User, RegisterUser, UserFilter}, Error};
 
 
-pub struct Account {
-    pool: Pool<Postgres>
-}
-
-pub fn filter_user(s: &mut SelectStatement, filter: UserFilter) {
-    if let Some(name_or_email) = &filter.name_or_email {
-        s.cond_where(
-            Cond::any()
-            .add(Expr::col(UserIden::Name).eq(name_or_email))
-            .add(Expr::col(UserIden::Email).eq(name_or_email))
-        );
+    pub trait Account<'q> {
+        /// Register a new user
+        fn register_user<'b>(self, args: RegisterUser) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b;
+        
+        /// Count the number of users matching the filter
+        fn count_user_by<'b>(self, filter: UserFilter) -> BoxFuture<'b, Result<i64, Error>> where 'q: 'b;
     }
 }
 
-impl Account {
-    pub async fn count_user_by(&self, filter: UserFilter) -> Result<i64, Error> {
+pub struct Account<DB> {
+    db: DB
+}
+
+impl<'q, DB> traits::Account<'q> for Account<&'q mut DB>
+where for<'a> &'a mut DB: Executor<'a, Database = Postgres> + std::marker::Send
+{
+    fn count_user_by<'b>(self, filter: UserFilter) -> BoxFuture<'b, Result<i64, Error>> 
+    where 'q: 'b
+    {
+        Box::pin(async {
+            count_user_by(self.db, filter).await
+        })
+    }
+
+    /// Register a new user
+    fn register_user<'b>(self, args: RegisterUser) -> BoxFuture<'b, Result<User, Error>> 
+    where 'q: 'b
+    {
+        Box::pin(async {
+            register_user(self.db, args).await
+        })
+    }
+}
+
+async fn count_user_by<'c, E>(executor: &'c mut E, filter: UserFilter) -> Result<i64, Error> 
+where &'c mut E: Executor<'c, Database = Postgres>
+{
+    let (sql, arguments) = sql_query::count_user_by_query(filter);
+    let result = sqlx::query_with(&sql, arguments).fetch_one(executor).await?;
+    Ok(result.get("count"))
+}
+
+/// Register a new user
+async fn register_user<'c, E>(executor: &'c mut E, args: RegisterUser) -> Result<User, Error> 
+    where &'c mut E: Executor<'c, Database = Postgres>
+{
+    let (sql, arguments) = sql_query::register_user_query(args);
+    let row = sqlx::query_with(&sql, arguments).fetch_one(executor).await?;
+    Ok(User::from_row(&row)?)
+}
+
+pub mod sql_query {
+    use sea_query::{SelectStatement, Cond, Expr, Alias, Query, PostgresQueryBuilder};
+    use sea_query_binder::{SqlxValues, SqlxBinder};
+
+    use crate::{model::user::{UserFilter, RegisterUser}, sql::UserIden};
+
+    pub fn filter_user(s: &mut SelectStatement, filter: UserFilter) {
+        if let Some(name_or_email) = &filter.name_or_email {
+            s.cond_where(
+                Cond::any()
+                .add(Expr::col(UserIden::Name).eq(name_or_email))
+                .add(Expr::col(UserIden::Email).eq(name_or_email))
+            );
+        }
+    }
+
+
+    pub fn count_user_by_query(filter: UserFilter) -> (String, SqlxValues) {
         let mut qb = Query::select();
         
         qb
@@ -30,23 +85,13 @@ impl Account {
         .from(UserIden::Table);
         
         // Filter the user
-        filter_user(&mut qb, filter);
+        filter_user(&mut qb, filter); 
 
-        let (sql, values) = qb.build_sqlx(PostgresQueryBuilder);
-        let result = sqlx::query_with(&sql, values).fetch_one(&self.pool).await?;
-        
-        Result::Ok(result.get("count"))
+        qb.build_sqlx(PostgresQueryBuilder)
     }
 
-    /// Register a new user
-    pub async fn register_user(&self, mut args: RegisterUser) -> Result<User, Error> {
-        args.password = PasswordHash::generate(
-            Argon2::default(), 
-            args.password, 
-            &SaltString::generate(rand::thread_rng())
-        ).expect("Cannot generate password hash").to_string();
-        
-        let (sql, values) = Query::insert()
+    pub fn register_user_query(args: RegisterUser) -> (String, SqlxValues) {
+        Query::insert()
             .into_table(UserIden::Table)
             .columns([
                 UserIden::Name, 
@@ -63,17 +108,7 @@ impl Account {
                 UserIden::Name,
                 UserIden::Email,
                 UserIden::Avatar
-            ])).build_sqlx(PostgresQueryBuilder);
-        
-        let row = sqlx::query_with(&sql, values)
-        .fetch_one(&self.pool)
-        .await?;
-
-        return Result::Ok(User {
-            id: row.get("id"),
-            name: row.get("name"),
-            email: row.get("email"),
-            avatar: row.get("avatar")
-        })
+            ])).build_sqlx(PostgresQueryBuilder)
     }
 }
+

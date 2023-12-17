@@ -1,21 +1,20 @@
 use signuis_core::config::{Config, ConfigArgs, Mode};
-use signuis_core::services::{DatabaseArgs, DatabasePool, traits::Database, DatabaseTx, ServiceTx, ServiceTxArgs};
+use signuis_core::services::{ServicePool, DatabasePoolArgs, ServicePoolArgs};
+use signuis_core::services::{DatabasePool};
 use signuis_core::Error;
-use sqlx::Postgres;
+use sqlx::{Postgres, Pool};
 
 pub fn setup_config() {
     Config::init(ConfigArgs::default().set_mode(Mode::Test));
 }
 
-pub async fn setup_database() -> Result<DatabaseTx<'static, Postgres>, Error>{
+pub async fn setup_database() -> Result<Pool<Postgres>, Error>{
     let database_url = Config::try_get_database_url()?;
-    let db = DatabasePool::new(DatabaseArgs::new(database_url.as_str())).await?;
-    let mut tx = db.begin().await?;
-    tx.migrate().await?;
-    return Result::Ok(tx);
+    let db = DatabasePool::new(DatabasePoolArgs::new(database_url.as_str())).await?;
+    Ok(db)
 }
 
-pub async fn setup_services() -> Result<ServiceTx, Error>{
+pub async fn setup_services() -> Result<ServicePool, Error>{
     let tx = setup_database().await?;
-    Ok(ServiceTx::new(ServiceTxArgs::new(tx)))
+    Ok(ServicePool::new(ServicePoolArgs::new(tx)))
 }

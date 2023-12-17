@@ -1,21 +1,20 @@
-use sqlx::{Row, FromRow, Executor, Acquire};
-use async_trait::async_trait;
+use futures::future::BoxFuture;
+use sqlx::{Row, FromRow, Executor, Postgres};
 
 use crate::{Error, model::{session::Session, auth::{Credentials, StoredCredentials}}};
 
 pub mod traits {
-    use async_trait::async_trait;
+    use futures::future::BoxFuture;
 
     use crate::{Error, model::{session::Session, auth::Credentials}};
 
-    #[async_trait]
-    pub trait Authentication {
+    pub trait Authentication<'q> {
         /// Verify the token
-        async fn check_token(self, token: String) -> Result<Option<Session>, Error>;
+        fn check_token<'a, 'b>(self, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b, 'q: 'b;
         /// Get a session by an IP, creates one if does not exist.
-        async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error>;
+        fn get_session_by_ip<'a, 'b>(self, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
         /// Check credentials, and creates a session
-        async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error>;
+        fn check_credentials<'a, 'b>(self, credentials: Credentials, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
     }
 }
 
@@ -46,7 +45,23 @@ mod sql_query {
     use sea_query::{PostgresQueryBuilder, Query, CommonTableExpression, Alias, Expr};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::{sql::{UserIden, SessionIden}, services::filter_user, model::user::UserFilter, utils::generate_token};
+    use crate::{sql::{UserIden, SessionIden}, services::account::sql_query::filter_user, model::user::UserFilter, utils::generate_token};
+
+    pub fn check_token_query(token: &str) -> (String, SqlxValues) {
+        Query::select()
+        .from(SessionIden::Table)
+        .left_join(UserIden::Table, Expr::col((UserIden::Table, UserIden::ID)).equals(Alias::new("id")))
+        .exprs([
+            Expr::col(SessionIden::ID).as_enum(Alias::new("session_id")),
+            Expr::col(SessionIden::IP).as_enum(Alias::new("session_ip")),
+            Expr::col(UserIden::ID).as_enum(Alias::new("user_id")),
+            Expr::col(UserIden::Name).as_enum(Alias::new("user_name")),
+            Expr::col(UserIden::Email).as_enum(Alias::new("user_email")),
+            Expr::col(UserIden::Avatar).as_enum(Alias::new("user_avatar")),
+        ])
+        .and_where(Expr::col(SessionIden::Token).eq(token))
+        .build_sqlx(PostgresQueryBuilder)
+    }
 
     pub fn check_credentials_query(name_or_email: &str) -> (String, SqlxValues) {
         let mut qb = Query::select()
@@ -62,7 +77,7 @@ mod sql_query {
         qb.build_sqlx(PostgresQueryBuilder)
     }
 
-    pub fn create_session_by_user_query(user_id: String, ip: String) -> (String, SqlxValues) {
+    pub fn create_session_by_user_query(user_id: String, ip: &str) -> (String, SqlxValues) {
         let token = generate_token(16);
 
         //let mut expires_at = Utc::now().checked_add_signed(Duration::hours(8)).unwrap();
@@ -123,63 +138,48 @@ mod sql_query {
     }
 }
 
-#[async_trait]
-impl<'c, E> traits::Authentication for &'_ Authentication<E> where for<'a> &'a E: Acquire<'c> {
-    async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
-        let mut conn = self.db.acquire().await?;
-        
-        let user_id: String = check_credentials(&mut conn, credentials).await?;
-        let session = create_session_by_user(&mut conn, user_id, ip).await?;
-
-        return Result::Ok(session);
+impl<'q, E> traits::Authentication<'q> for Authentication<&'q mut E> 
+    where for<'a> &'a mut E: Executor<'a, Database = Postgres> + std::marker::Send
+{
+    fn check_credentials<'a, 'b>(self, credentials: Credentials, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> 
+    where 'a: 'b, 'q: 'b
+    {
+       Box::pin(async  {
+            check_credentials(self.db, credentials, ip).await
+        })
     }
     
-    async fn check_token(self, token: String) -> Result<Option<Session>, Error> {
-        let mut conn = self.db.acquire().await?;
-        return check_token(&mut conn, token).await;
+    fn check_token<'a, 'b>(self, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> 
+    where 'a: 'b, 'q: 'b
+    {
+        Box::pin(async {
+            check_token(self.db, token).await
+        })
     }
 
-    async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error> {
-        let result = find_session_by_ip(self.db, ip).await?;
-
-        if result.is_some() {
-            return Result::Ok(result.unwrap())
-        }
-
-        return create_session_by_ip(self.db, ip).await;
+    fn get_session_by_ip<'a, 'b>(self, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> 
+    where 'a: 'b, 'q: 'b
+    {
+        Box::pin(async {
+            get_session_by_ip(self.db, ip).await          
+        })
     }
 }
 
-#[async_trait]
-impl<'c, E> traits::Authentication for &'_ mut Authentication<E> where for<'a> &'a mut E: Acquire<'c> 
-{
-    async fn check_credentials(self, credentials: Credentials, ip: String) -> Result<Session, Error> {
-        let mut conn = self.db.acquire().await?;
-        let user_id: String = check_credentials(&mut conn, credentials).await?;
-        let session = create_session_by_user(&mut conn, user_id, ip).await?;
-
-        return Result::Ok(session);
-    }
-    
-    async fn check_token(self, token: String) -> Result<Option<Session>, Error> {
-        let mut conn = self.db.acquire().await?;
-        return check_token(&mut conn, token).await;
-    }
-
-    async fn get_session_by_ip(self, ip: &String) -> Result<Session, Error> {
-        let mut conn = self.db.acquire().await?;
-        let result = find_session_by_ip(&mut conn, ip).await?;
-
-        if result.is_some() {
-            return Result::Ok(result.unwrap())
-        }
-
-        return create_session_by_ip(&mut conn, ip).await;
-    }
+/// Check the session token and returns a session if any
+async fn check_token<'c, E: Executor<'c, Database = Postgres>>(executor: E, token: &str) -> Result<Session, Error> {
+    let (sql, arguments) = sql_query::check_token_query(token);
+    let query = sqlx::query_with(&sql, arguments);
+    let result = executor.fetch_optional(query).await?;
+    let row = result.ok_or(Error::InvalidTokenSession)?;
+    let session = Session::from_row(&row)?;
+    Ok(session)
 }
 
 // Check the credentials, returns the user id on success
-async fn check_credentials<'c, E: Executor<'c>>(executor: E, credentials: Credentials) -> Result<String, Error> {
+async fn check_credentials_returns_user<'a, E>(executor: &'a mut E, credentials: Credentials) -> Result<String, Error> 
+    where &'a mut E: Executor<'a, Database = Postgres>
+{
     //
     let stored_opt = get_stored_credentials(executor, credentials.name_or_email).await?;
 
@@ -198,8 +198,27 @@ async fn check_credentials<'c, E: Executor<'c>>(executor: E, credentials: Creden
     return Result::Ok(stored.id);
 }
 
+async fn check_credentials<E>(executor: &mut E, credentials: Credentials, ip: &str) -> Result<Session, Error> 
+    where for <'a> &'a mut E: Executor<'a, Database = Postgres>
+{  
+
+    let user_id = check_credentials_returns_user(
+        executor, 
+        credentials
+    ).await?;
+
+
+    let result = create_session_by_user(
+        executor, 
+        user_id, 
+        ip).await;
+
+    result
+}
+
+
 /// Get stored credentials
-async fn get_stored_credentials<'c, E: Executor<'c>>(executor: E, name_or_email: String) -> Result<Option<StoredCredentials>, Error> {
+async fn get_stored_credentials<'c, E: Executor<'c, Database = Postgres>>(executor: E, name_or_email: String) -> Result<Option<StoredCredentials>, Error> {
     let (sql, arguments) = sql_query::check_credentials_query(&name_or_email);
 
     let result = sqlx::query_with(&sql, arguments)
@@ -218,8 +237,32 @@ async fn get_stored_credentials<'c, E: Executor<'c>>(executor: E, name_or_email:
     }))
 }
 
+/// Create a user session
+async fn create_session_by_user<'c, E>(executor: &'c mut E, user_id: String, ip: &str) -> Result<Session, Error> 
+    where &'c mut E: Executor<'c, Database = Postgres>
+{
+    let (sql, arguments) = sql_query::create_session_by_user_query(user_id, ip);
+    let row = sqlx::query_with(&sql, arguments).fetch_one(executor).await?;
+    return Result::Ok(Session::from_row(&row)?);
+}
+
+/// Create an anonymous session
+async fn create_session_by_ip<'c, E>(executor: E, ip: &str) -> Result<Session, Error> 
+where E: Executor<'c, Database = Postgres>
+{
+    let (sql, arguments) = sql_query::create_session_by_ip_query(ip);
+
+    let row = sqlx::query_with(&sql, arguments)
+        .fetch_one(executor)
+        .await?;
+
+    return Result::Ok(Session::from_row(&row)?);
+}
+
 /// Find a session by its ip
-async fn find_session_by_ip<'c, E: Executor<'c>>(executor: E, ip: &str) -> Result<Option<Session>, Error> {
+async fn find_session_by_ip<'c, E>(executor: &'c mut E, ip: &str) -> Result<Option<Session>, Error> 
+    where &'c mut E: Executor<'c, Database = Postgres>
+{
     let result= sqlx::query("SELECT id, user_id, ip FROM Session as t0 WHERE t0.ip=?")
     .bind(ip)
     .fetch_optional(executor)
@@ -233,21 +276,15 @@ async fn find_session_by_ip<'c, E: Executor<'c>>(executor: E, ip: &str) -> Resul
     return Result::Ok(Option::None);
 }
 
-/// Create a user session
-async fn create_session_by_user<'c, E: Executor<'c>>(executor: E, user_id: String, ip: String) -> Result<Session, Error> {
-    let (sql, arguments) = sql_query::create_session_by_user_query(user_id, ip);
-    let row = sqlx::query_with(&sql, arguments).fetch_one(executor).await?;
-    return Result::Ok(Session::from_row(&row)?);
+/// Get session by ip
+async fn get_session_by_ip<E>(conn: &mut E, ip: &str) -> Result<Session, Error> 
+    where for<'a> &'a mut E: Executor<'a, Database = Postgres>
+{
+    let result = find_session_by_ip(conn, ip).await?;
+
+    if result.is_some() {
+        return Result::Ok(result.unwrap())
+    }
+
+    return create_session_by_ip(conn, ip).await;
 }
-
-/// Create an anonymous session
-async fn create_session_by_ip<'c, E: Executor<'c>>(executor: E, ip: &String) -> Result<Session, Error> {
-    let (sql, arguments) = sql_query::create_session_by_ip_query(ip);
-
-    let row = sqlx::query_with(&sql, arguments)
-        .fetch_one(executor)
-        .await?;
-
-    return Result::Ok(Session::from_row(&row)?);
-}
-

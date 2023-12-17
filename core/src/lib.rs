@@ -1,6 +1,7 @@
 mod error;
 mod utils;
 mod sql;
+mod repositories;
 
 pub mod config;
 pub use error::{Error, IssueBuilder, Issue};

@@ -5,66 +5,93 @@ mod authentication;
 pub use database::*;
 pub use authentication::*;
 pub use account::*;
-use sqlx::Postgres;
+use futures::future::BoxFuture;
+use sqlx::{Postgres, Pool, Transaction, Acquire};
 
-use self::traits::AuthenticationContainer;
+use crate::{Error, model::{session::Session, auth::Credentials}};
+
 
 pub mod traits {
     pub use super::authentication::traits::Authentication;
-    pub use super::database::traits::Database;
 
-    pub trait Container<'a, Entity> {
-        fn with() ->  &'a Box<dyn Entity>;
+    pub trait Hub {
+        type Authentication: for <'q> Authentication<'q>;
+
+        fn auth(self) -> Self::Authentication;
     }
-    
+}
+
+pub struct ServicePoolArgs {
+    pool: Pool<Postgres>
+}
+
+impl ServicePoolArgs {
+    pub fn new(pool: Pool<Postgres>) -> Self {
+        Self{pool}
+    }
 }
 
 /// Service pool
 pub struct ServicePool {
-    db: DatabasePool
+    pool: Pool<Postgres>
 }
 
-impl Container<traits::Database> for &'_ ServicePool {
-    type Authentication = Authentication<DatabasePool>;
+impl ServicePool {
+    pub fn new(args: ServicePoolArgs) -> Self {
+        Self{pool: args.pool}
+    }
 
-    fn get(self) -> Self::Authentication {
-        Self::Authentication::new(AuthenticationArgs::new(&self.db))
+    pub async fn begin(self) -> Result<ServiceTx<'static>, Error> {
+        let tx = self.pool.begin().await?;
+        Ok(ServiceTx::new(tx))
     }
 }
 
 /// Service transaction
 pub struct ServiceTx<'a> {
-    db:     SharedDatabaseTx<'a, Postgres>,
-    auth:   Box<Authentication<SharedDatabaseTx<'a, Postgres>>>
-}
-
-pub struct ServiceTxArgs<'a> {
-    db: DatabaseTx<'a>
-}
-
-impl<'a> ServiceTxArgs<'a> {
-    pub fn new(db: DatabaseTx<'a>) -> Self {
-        Self{db}
-    }
+    tx: Transaction<'a, Postgres>
 }
 
 impl<'a> ServiceTx<'a> {
-    pub fn new(args: ServiceTxArgs<'a>) -> Self {
-        let shared_db = args.db.into_shared();
+    pub fn new(tx: Transaction<'a, Postgres>) -> Self {
+        Self {tx}
+    }
 
-        Self {
-            db: shared_db.clone(),
-            auth: Box::new(
-                Authentication::new(
-                    AuthenticationArgs::new(shared_db.clone())
-                )
-            )
-        }
+    pub async fn commit(self) -> Result<(), Error> {
+        self.tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn rollback(self) -> Result<(), Error> {
+        self.tx.rollback().await?;
+        Ok(())
     }
 }
 
-impl<'a> Container<'a, traits::Authentication> for &'a ServiceTx<'a> {
-    fn with(self) -> &'a Box<dyn traits::Authentication> {
-        return &self.auth
+impl<'q> traits::Authentication<'q> for &'q mut ServiceTx<'_> {
+    fn check_token<'a, 'b>(self, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> 
+    where 'a: 'b, 'q: 'b
+    {
+        Box::pin(async {
+            let conn = self.tx.acquire().await?;
+            
+            let session = Authentication::new(AuthenticationArgs::new(conn))
+            .check_token(token)
+            .await?;
+
+            Ok(session)
+        })
+    }
+
+    fn get_session_by_ip<'a, 'b>(self, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> 
+    where 'a: 'b
+    {
+        todo!()
+    }
+
+    fn check_credentials<'a, 'b>(self, credentials: Credentials, ip: &str) -> futures::prelude::future::BoxFuture<'b, Result<crate::model::session::Session, crate::Error>> 
+    where 'a: 'b
+    {
+        todo!()
     }
 }
