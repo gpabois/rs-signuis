@@ -12,16 +12,16 @@ pub mod traits {
 
     pub trait Authentication {
         /// Verify the token, returns a session if the token is valid.
-        fn check_token<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b;
+        fn check_session_token<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b;
         /// Get a session by an IP, creates one if does not exist.
         //fn get_or_create_session_by_ip<'a, 'b>(self, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
         /// Check credentials, and returns the underlying user id, if any.
-        fn check_credentials<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, credential: Credential, client: &'a Client) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b;
+        fn authenticate_by_credentials<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, credential: Credential, client: &'a Client) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b;
     }
 }
 
 impl traits::Authentication for super::Service {
-    fn check_token<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b {
+    fn check_session_token<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b {
         Box::pin(async {
             let filter = SessionFilter::new()
                 .token_equals(token)
@@ -35,7 +35,7 @@ impl traits::Authentication for super::Service {
         })
     }
 
-    fn check_credentials<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, credential: Credential, client: &'a Client) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b {
+    fn authenticate_by_credentials<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, credential: Credential, client: &'a Client) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b {
         Box::pin(async {
             let scred_opt = self.repos.find_credentials_by(
                 querier, 
