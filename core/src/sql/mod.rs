@@ -5,6 +5,7 @@ pub enum SessionIden {
     ID,
     UserID,
     Token,
+    UserAgent,
     IP,
     //CreatedAt,
     ExpiresAt
@@ -17,6 +18,7 @@ impl Iden for SessionIden {
             Self::ID => "id",
             Self::UserID => "user_id",
             Self::Token => "token",
+            Self::UserAgent => "user_agent",
             Self::IP => "ip",
             //Self::CreatedAt => "created_at",
             Self::ExpiresAt => "expires_at"

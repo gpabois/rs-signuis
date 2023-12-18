@@ -7,12 +7,6 @@ pub struct RegisterUser {
     pub password:   String
 }
 
-pub struct InsertSession {
-    pub token:      String,
-    pub ip:         String,
-    pub user_id:    Option<String>,
-    pub expires_in: chrono::DateTime<Utc>
-}
 
 #[derive(Default)]
 pub struct CreateUser {

@@ -1,25 +1,23 @@
 use async_stream::try_stream;
 use futures::stream::BoxStream;
 
-use crate::model::credentials::HashedCredential;
-
-use super::Repository;
+use crate::{model::credentials::{HashedCredential, CredentialFilter}, drivers};
 
 pub mod traits {
     use futures::{future::BoxFuture, stream::BoxStream};
 
-    use crate::{model::credentials::HashedCredential, Error};
+    use crate::{model::credentials::{HashedCredential, CredentialFilter}, Error, drivers};
 
     pub trait CredentialRepository {
         // Find one credential based on the user's ID.
-        fn find_credentials_by<'a, 'b, Q: driver::DatabaseQuerier<'q>>(self, querier: Q, filter: CredentialFilter) 
+        fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
             -> BoxStream<'b, Result<HashedCredential, Error>> 
         where 'a: 'b;
     }
 }
 
 mod sql_query {
-    use sea_query::{Query, Condition, PostgresQueryBuilder};
+    use sea_query::{Query, PostgresQueryBuilder, Cond, Expr};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
     use crate::{model::credentials::CredentialFilter, sql::UserIden};
@@ -41,7 +39,7 @@ mod sql_query {
 }
 
 impl traits::CredentialRepository for super::Repository {
-    fn find_credentials_by<'a, 'b, Q: driver::DatabaseQuerier<'q>>(self, querier: Q, filter: CredentialFilter) 
+    fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
         -> BoxStream<'b, Result<crate::model::credentials::HashedCredential, crate::Error>> 
     where 'a: 'b {
         Box::pin(try_stream! {

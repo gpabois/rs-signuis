@@ -1,12 +1,12 @@
+use futures::{stream::BoxStream, future::BoxFuture};
 use sqlx::FromRow;
 
-use crate::model::session::Session;
+use crate::{model::{session::{Session, SessionFilter, InsertSession}}, drivers, Error};
 
 pub mod traits {
     use futures::{stream::BoxStream, future::BoxFuture};
-    use sqlx::{Executor, Database};
 
-    use crate::{model::{user::InsertSession, session::{SessionFilter, Session}}, Error, drivers};
+    use crate::{model::session::{SessionFilter, Session, InsertSession}, Error, drivers};
 
     pub trait SessionRepository{
         fn insert_session<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, insert: InsertSession) -> BoxFuture<'b, Result<Session, Error>>;
@@ -15,31 +15,35 @@ pub mod traits {
 }
 
 mod sql_query {
-    use sea_query::Query;
+    use sea_query::{Query, Alias, CommonTableExpression, Expr, PostgresQueryBuilder};
+    use sea_query_binder::SqlxValues;
 
-    use crate::model::user::InsertSession;
+    use crate::{model::session::InsertSession, sql::{SessionIden, UserIden}};
 
-    pub fn insert_session(InsertSession{ip, user_id, expires_in, token}: InsertSession) -> (String, SqlxValues) {
-        let token = generate_token(16);
+    pub fn insert_session(InsertSession{client, user_id, expires_in, token}: InsertSession) -> (String, SqlxValues) {
+        //let token = generate_token(16);
 
         let mut insert_query = Query::insert()
         .into_table(SessionIden::Table)
         .columns([
             SessionIden::UserID,
             SessionIden::IP,
+            SessionIden::UserAgent,
             SessionIden::Token,
             SessionIden::ExpiresAt
         ]).values([
             user_id.into(),
-            ip.into(),
+            client.ip.into(),
+            client.user_agent.into(),
             token.into(),
-            expires_at.into()
+            expires_in.into()
         ])
         .expect("Cannot bind values")
         .returning(Query::returning()
             .columns([
                 SessionIden::ID, 
                 SessionIden::UserID, 
+                SessionIden::UserAgent,
                 SessionIden::IP
             ])
         )
@@ -57,7 +61,9 @@ mod sql_query {
                 .left_join(UserIden::Table, Expr::col((UserIden::Table, UserIden::ID)).equals(Alias::new("id")))
                 .exprs([
                     Expr::col(SessionIden::ID).as_enum(Alias::new("session_id")),
-                    Expr::col(SessionIden::IP).as_enum(Alias::new("session_ip")),
+                    // Client
+                    Expr::col(SessionIden::IP).as_enum(Alias::new("client_ip")),
+                    Expr::col(SessionIden::UserAgent).as_enum(Alias::new("client_user_agent")),
                     // Left join on user
                     Expr::col(UserIden::ID).as_enum(Alias::new("user_id")),
                     Expr::col(UserIden::Name).as_enum(Alias::new("user_name")),
@@ -72,10 +78,10 @@ mod sql_query {
 
 impl traits::SessionRepository for &'_ super::Repository 
 {
-    fn insert_session<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, insert: InsertSession) -> BoxFuture<'b, Result<Session, Error>> 
+    fn insert_session<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, args: InsertSession) -> BoxFuture<'b, Result<Session, Error>> 
     {
         Box::pin(async {
-            let (sql, arguments) = sql_query::insert_session(insert_session);
+            let (sql, arguments) = sql_query::insert_session(args);
             let row = sqlx::query_with(&sql, arguments).fetch_one(querier).await?;
             Ok(Session::from_row(&row))
         })

@@ -1,1 +1,3 @@
-pub type DatabaseQuerier<'c> = Executor<'c, Database=Postgres>;
+use sqlx::{Executor, Postgres};
+
+pub trait DatabaseQuerier<'c>: Executor<'c, Database=Postgres>{}

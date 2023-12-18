@@ -24,9 +24,44 @@ impl SessionFilter {
     }
 }
 
+#[derive(Clone)]
+pub struct Client {
+    pub ip: String,
+    pub user_agent: String
+}
+
+pub type SessionClient = Client;
+
+impl<'r> FromRow<'r, PgRow> for SessionClient {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            ip: row.try_get("client_ip")?,
+            user_agent: row.try_get("client_user_agent")?
+        })
+    }
+}
+
+pub struct InsertSession {
+    pub token:      String,
+    pub client:     Client,
+    pub user_id:    Option<String>,
+    pub expires_in: chrono::DateTime<Utc>
+}
+
+impl InsertSession {
+    pub fn new(token: String, client: Client) -> Self {
+        Self{
+            token,
+            client,
+            user_id: None,
+            expires_in: Utc::now()    
+        }
+    }
+}
+
 pub struct Session {
     pub id:     String,
-    pub ip:     String,
+    pub client: Client,
     pub user:   Option<UserSession>,
 }
 
@@ -66,7 +101,7 @@ impl<'r> FromRow<'r, PgRow> for Session
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Result::Ok(Session {
             id: row.try_get("session_id")?,
-            ip: row.try_get("session_ip")?,
+            client: SessionClient::from_row(row)?,
             user: OptionalUserSession::from_row(row)?.into()
         })
     }

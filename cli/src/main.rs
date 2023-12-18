@@ -1,4 +1,4 @@
-use signuis_core::{services::{Database, DatabaseArgs, IDatabase, DatabasePool}, config::{Config, ConfigArgs}, Error};
+use signuis_core::{services::{Database, DatabasePool, DatabasePoolArgs}, config::{Config, ConfigArgs}, Error};
 use signuis_core::log::{info, error};
 
 #[tokio::main]
@@ -33,8 +33,8 @@ async fn migrate_database() -> Result<(), Error> {
     Config::init(ConfigArgs::default());
     let database_url = Config::try_get_database_url()?;
     info!(target: "signuis::cli", "Migrating...");
-    let db = DatabasePool::new(DatabaseArgs::new(database_url.as_str())).await?;
-    db.migrate().await?;
+    let db = DatabasePool::new(DatabasePoolArgs::new(database_url.as_str())).await?;
+    Database::migrate(&db).await?;
     info!(target: "signuis::cli", "done !");
     Result::Ok(())
 }
@@ -44,8 +44,8 @@ async fn revert_database() -> Result<(), Error> {
     Config::init(ConfigArgs::default());
     let database_url = Config::try_get_database_url()?;
     info!(target: "signuis::cli", "Reverting...");
-    let db = DatabasePool::new(DatabaseArgs::new(database_url.as_str())).await?;
-    db.revert().await?;
+    let db = DatabasePool::new(DatabasePoolArgs::new(database_url.as_str())).await?;
+    Database::revert(&db).await?;
     info!(target: "signuis::cli", "done !");
     Result::Ok(())
 }
