@@ -1,43 +1,52 @@
-use futures::future::BoxFuture;
+use chrono::DateTime;
+use futures::{future::BoxFuture, TryStreamExt};
 use sqlx::{Row, FromRow, Executor, Postgres};
 
-use crate::{Error, model::{session::Session, auth::{Credentials, StoredCredentials}}};
+use crate::{Error, model::{session::{Session, SessionFilter}, credentials::{Credentials, StoredCredentials, CredentialFilter, Credential}}, repositories::{sessions::traits::SessionRepository, credentials::traits::CredentialRepository}};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{Error, model::{session::Session, auth::Credentials}};
+    use crate::{Error, model::{session::Session, credentials::Credentials}, repositories::sessions::traits::SessionRepository};
 
-    pub trait Authentication<'q> {
-        /// Verify the token
-        fn check_token<'a, 'b>(self, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b, 'q: 'b;
+    pub trait Authentication {
+        /// Verify the token, returns a session if the token is valid.
+        fn check_token<'b, Q: driver::DatabaseQuerier>(self, querier: Q, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b;
         /// Get a session by an IP, creates one if does not exist.
-        fn get_session_by_ip<'a, 'b>(self, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
-        /// Check credentials, and creates a session
-        fn check_credentials<'a, 'b>(self, credentials: Credentials, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
+        //fn get_or_create_session_by_ip<'a, 'b>(self, ip: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
+        /// Check credentials, and returns the underlying user id, if any.
+        fn check_credentials<'a, 'b, Q: driver::DatabaseQuerier>(self, querier: Q, credentials: Credentials, ip: &'a str) -> BoxFuture<'b, Result<String, Error>> where 'a: 'b;
+        /// Create a session
+        //fn create_session<'a>(self, args: CreateSession) -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
     }
 }
 
+impl traits::Authentication for super::Service {
+    fn check_token<'b, Q: driver::DatabaseQuerier>(self, querier: Q, token: &'a str) -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b {
+        Box::pin(async {
+            let filter = SessionFilter::new()
+                .token_equals(token)
+                .expires_at_time_lower_or_equal(Utc::now());
 
-pub struct AuthenticationArgs<A> {
-    db: A
-}
-
-impl<A> AuthenticationArgs<A>{
-    pub fn new(db: A) -> Self {
-        Self{db}
+            self.repos.find_session_by(querier, filter).try_next()
+        })
     }
-}
 
-pub struct Authentication<A> {
-    db: A
-}
+    fn check_credentials<'a, 'b, Q: driver::DatabaseQuerier>(self, querier: Q, credential: Credential, ip: &'a str) -> BoxFuture<'b, Result<String, Error>> where 'a: 'b {
+        Box::pin(async {
+            let scred_opt = self.repos.find_credentials_by(
+                querier, 
+                CredentialFilter::new().name_or_email_equal_to(&credential.name_or_email)
+            )
+            .try_next()
+            .await?;
 
-impl<A> Authentication<A> {
-    pub fn new(args: AuthenticationArgs<A>) -> Self {
-        Self {
-            db: args.db
-        }
+            if scred_opt.is_none() {
+                return Err(Error::invalid_credentials())
+            }
+
+            
+        })
     }
 }
 
@@ -46,22 +55,6 @@ mod sql_query {
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
     use crate::{sql::{UserIden, SessionIden}, services::account::sql_query::filter_user, model::user::UserFilter, utils::generate_token};
-
-    pub fn check_token_query(token: &str) -> (String, SqlxValues) {
-        Query::select()
-        .from(SessionIden::Table)
-        .left_join(UserIden::Table, Expr::col((UserIden::Table, UserIden::ID)).equals(Alias::new("id")))
-        .exprs([
-            Expr::col(SessionIden::ID).as_enum(Alias::new("session_id")),
-            Expr::col(SessionIden::IP).as_enum(Alias::new("session_ip")),
-            Expr::col(UserIden::ID).as_enum(Alias::new("user_id")),
-            Expr::col(UserIden::Name).as_enum(Alias::new("user_name")),
-            Expr::col(UserIden::Email).as_enum(Alias::new("user_email")),
-            Expr::col(UserIden::Avatar).as_enum(Alias::new("user_avatar")),
-        ])
-        .and_where(Expr::col(SessionIden::Token).eq(token))
-        .build_sqlx(PostgresQueryBuilder)
-    }
 
     pub fn check_credentials_query(name_or_email: &str) -> (String, SqlxValues) {
         let mut qb = Query::select()

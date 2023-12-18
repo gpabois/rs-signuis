@@ -1,8 +1,27 @@
+use chrono::Utc;
 use sqlx::{FromRow, Row, postgres::PgRow};
 
+#[derive(Default)]
 pub struct SessionFilter {
-    pub token_eq: Option<String>,
-    pub ip_eq: Option<String>
+    pub token_eq:       Option<String>,
+    pub expires_lte:    Option<chrono::DateTime<Utc>>,
+    pub ip_eq:          Option<String>
+}
+
+impl SessionFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn token_equals(mut self, value: &str) -> Self {
+        self.token_eq = Option::Some(value.into());
+        self
+    }
+
+    pub fn expires_at_time_lower_or_equal(mut self, value: chrono::DateTime<Utc>) -> Self {
+        self.expires_lte = Option::Some(value);
+        self
+    }
 }
 
 pub struct Session {
