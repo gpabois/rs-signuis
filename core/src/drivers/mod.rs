@@ -1,3 +1,3 @@
-use sqlx::{Executor, Postgres};
+mod querier;
 
-pub trait DatabaseQuerier<'c>: Executor<'c, Database=Postgres>{}
+pub use querier::*;

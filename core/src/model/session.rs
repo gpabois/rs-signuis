@@ -1,6 +1,8 @@
 use chrono::Utc;
 use sqlx::{FromRow, Row, postgres::PgRow};
 
+use crate::utils::generate_token;
+
 #[derive(Default)]
 pub struct SessionFilter {
     pub token_eq:       Option<String>,
@@ -30,6 +32,15 @@ pub struct Client {
     pub user_agent: String
 }
 
+impl Client {
+    pub fn new(ip: &str, user_agent: &str) -> Self {
+        Self{
+            ip: ip.into(),
+            user_agent: user_agent.into()
+        }
+    }
+}
+
 pub type SessionClient = Client;
 
 impl<'r> FromRow<'r, PgRow> for SessionClient {
@@ -42,6 +53,7 @@ impl<'r> FromRow<'r, PgRow> for SessionClient {
 }
 
 pub struct InsertSession {
+    pub id:         Option<String>,
     pub token:      String,
     pub client:     Client,
     pub user_id:    Option<String>,
@@ -49,13 +61,45 @@ pub struct InsertSession {
 }
 
 impl InsertSession {
-    pub fn new(token: String, client: Client) -> Self {
+    pub fn new_with_token(token: String, client: Client) -> Self {
         Self{
+            id: None,
             token,
             client,
             user_id: None,
             expires_in: Utc::now()    
         }
+    }
+
+    pub fn new(client: Client) -> Self {
+        let token = generate_token(16);
+        Self{
+            id: None,
+            token,
+            client,
+            user_id: None,
+            expires_in: Utc::now()    
+        }
+    }
+
+    pub fn set_id(mut self, value: &str) -> Self {
+        self.id = Some(value.into());
+        self       
+    }
+
+    pub fn set_user_id(mut self, user_id: &str) -> Self {
+        self.user_id = Some(user_id.into());
+        self
+    }
+
+    pub fn set_expires_in(mut self, value: chrono::DateTime<Utc>) -> Self {
+        self.expires_in = value;
+        self
+    }
+
+    pub fn set_token(mut self, value: &str) -> Self {
+        self.token = value.into();
+        self
     }
 }
 
@@ -63,6 +107,21 @@ pub struct Session {
     pub id:     String,
     pub client: Client,
     pub user:   Option<UserSession>,
+}
+
+impl Session {
+    /// Create an anonymous session
+    pub fn anonymous(client: Client) -> Self {
+        Self {
+            id: "anonymous".into(),
+            user: None,
+            client
+        }
+    }
+
+    pub fn is_anonynmous(&self) -> bool {
+        return self.user.is_none()
+    }
 }
 
 pub struct UserSession {

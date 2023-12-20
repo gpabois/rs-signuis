@@ -1,34 +1,6 @@
 use sqlx::migrate::MigrateError;
 
-#[derive(Debug)]
-pub struct Issue {
-    pub path: Vec<String>,
-    pub code: String,
-    pub message: String
-}
-
-pub struct IssueBuilder {
-    issues: Vec<Issue>
-}
-
-impl IssueBuilder {
-    pub fn new() -> Self {
-        return Self {
-            issues: Vec::default()
-        }
-    }
-
-    pub fn add(mut self, issue: Issue) -> Self {
-        self.issues.push(issue);
-        return self
-    }
-}
-
-impl Into<Vec<Issue>> for IssueBuilder {
-    fn into(self) -> Vec<Issue> {
-        return self.issues
-    }
-}
+use crate::Issue;
 
 #[derive(Debug)]
 pub enum Error {
@@ -37,10 +9,14 @@ pub enum Error {
     DatabaseError(sqlx::Error),
     ValidationError(Vec<Issue>),
     InvalidCredentials,
-    InvalidTokenSession
+    InvalidTokenSession,
+    Unauthorized
 }
 
 impl Error {
+    pub fn unauthorized() -> Self {
+        return Self::Unauthorized
+    }
     pub fn invalid_credentials() -> Self {
         return Self::InvalidCredentials;
     }

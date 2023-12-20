@@ -1,10 +1,10 @@
-use std::ops::Deref;
-
 use sqlx::{Postgres, Pool, Acquire};
 use sqlx::postgres::PgPoolOptions;
-use sqlx::migrate::{Migrator, Migrate};
+use sqlx::migrate::Migrator;
 
 use crate::Error;
+
+use super::{ServicePool, ServiceTx};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
@@ -27,19 +27,30 @@ impl DatabasePool {
     }
 } 
 
-pub struct Database{}
+impl ServicePool {
+    pub async fn migrate_database(&self) -> Result<(), Error> {
+        let mut executor = self.querier.acquire().await?;
+        MIGRATOR.run(&mut executor).await?;
+        Ok(())
+    }
 
-impl Database {
-    pub async fn migrate<'c, A>(executor: A) -> Result<(), Error> 
-        where A: Acquire<'c>, 
-                <A::Connection as Deref>::Target: Migrate 
-    {
+    pub async fn revert_database(self) -> Result<(), Error> {
+        let mut executor = self.querier.acquire().await?;
+        MIGRATOR.undo(&mut executor, -1).await?;
+        Ok(())
+    }
+}
+
+impl<'q> ServiceTx<'q> {
+    pub async fn migrate_database(&mut self) -> Result<(), Error> {
+        let executor = self.querier.acquire().await?;
         MIGRATOR.run(executor).await?;
         Ok(())
     }
 
-    pub async fn revert<'c, A>(executor: A) -> Result<(), Error> where A: Acquire<'c>, <A::Connection as Deref>::Target: Migrate {
-        MIGRATOR.undo(executor, -1).await?;
+    pub async fn revert_database(&mut self) -> Result<(), Error> {
+        let executor = self.querier.acquire().await?;
+        MIGRATOR.undo( executor, -1).await?;
         Ok(())
     }
 }

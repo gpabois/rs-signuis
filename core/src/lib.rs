@@ -1,11 +1,14 @@
 mod error;
 mod utils;
 mod sql;
-mod repositories;
-mod drivers;
+mod issues;
+
+pub mod repositories;
+pub mod drivers;
 
 pub mod config;
-pub use error::{Error, IssueBuilder, Issue};
+pub use issues::*;
+pub use error::Error;
 pub mod model;
 pub mod services;
 

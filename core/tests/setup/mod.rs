@@ -1,6 +1,7 @@
+use futures::future::BoxFuture;
 use signuis_core::config::{Config, ConfigArgs, Mode};
-use signuis_core::services::{ServicePool, DatabasePoolArgs, ServicePoolArgs};
-use signuis_core::services::{DatabasePool};
+use signuis_core::services::database::{DatabasePool, DatabasePoolArgs};
+use signuis_core::services::{Service, ServicePool, ServiceTx};
 use signuis_core::Error;
 use sqlx::{Postgres, Pool};
 
@@ -14,7 +15,17 @@ pub async fn setup_database() -> Result<Pool<Postgres>, Error>{
     Ok(db)
 }
 
-pub async fn setup_services() -> Result<ServicePool, Error>{
-    let tx = setup_database().await?;
-    Ok(ServicePool::new(ServicePoolArgs::new(tx)))
+pub trait AsyncFnOnce<'a, Args, R>: std::ops::FnOnce(Args) -> BoxFuture<'a, R> {}
+
+pub async fn with_service<F>(with: F) 
+    -> Result<(), Error> 
+    where for<'a, 'f, 'g> F:  std::ops::FnOnce(&'a mut ServiceTx<'g>) -> BoxFuture<'a, Result<(), Error>>
+{
+    setup_config();
+    let pool = setup_database().await?;
+    let hub: Service<Pool<Postgres>> = ServicePool::new(pool);
+    let mut tx = hub.begin().await?;
+    with(&mut tx).await?;
+    tx.rollback().await?;
+    Ok(())
 }

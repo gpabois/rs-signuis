@@ -1,29 +1,33 @@
 use futures::{stream::BoxStream, future::BoxFuture};
 use sqlx::FromRow;
 
-use crate::{model::{session::{Session, SessionFilter, InsertSession}}, drivers, Error};
+use crate::{model::session::{Session, SessionFilter, InsertSession}, drivers, Error};
 
 pub mod traits {
     use futures::{stream::BoxStream, future::BoxFuture};
 
     use crate::{model::session::{SessionFilter, Session, InsertSession}, Error, drivers};
 
-    pub trait SessionRepository{
-        fn insert_session<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, insert: InsertSession) -> BoxFuture<'b, Result<Session, Error>>;
-        fn find_session_by<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: SessionFilter) -> BoxStream<'b, Result<Session, Error>>;
+    pub trait SessionRepository<'q>{
+        fn insert_session<Q: drivers::DatabaseQuerier<'q>>(self, querier: Q, insert: InsertSession) 
+            -> BoxFuture<'q, Result<Session, Error>>
+            where Q: 'q;
+        fn find_session_by<Q: drivers::DatabaseQuerier<'q>>(self, querier: Q, filter: SessionFilter) 
+            -> BoxStream<'q, Result<Session, Error>>
+            where Q: 'q;
     }
 }
 
 mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, Expr, PostgresQueryBuilder};
-    use sea_query_binder::SqlxValues;
+    use sea_query_binder::{SqlxValues, SqlxBinder};
 
     use crate::{model::session::InsertSession, sql::{SessionIden, UserIden}};
 
-    pub fn insert_session(InsertSession{client, user_id, expires_in, token}: InsertSession) -> (String, SqlxValues) {
+    pub fn insert_session(InsertSession{client, user_id, expires_in, token, id}: InsertSession) -> (String, SqlxValues) {
         //let token = generate_token(16);
 
-        let mut insert_query = Query::insert()
+        let insert_query = Query::insert()
         .into_table(SessionIden::Table)
         .columns([
             SessionIden::UserID,
@@ -53,6 +57,7 @@ mod sql_query {
             CommonTableExpression::new()
                 .table_name(Alias::new("inserted_report"))
                 .query(insert_query)
+                .to_owned()
         )
         .to_owned()
         .query(
@@ -75,20 +80,23 @@ mod sql_query {
     }
 }
 
-
-impl traits::SessionRepository for &'_ super::Repository 
+impl<'q> traits::SessionRepository<'q> for &'q super::Repository 
 {
-    fn insert_session<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, args: InsertSession) -> BoxFuture<'b, Result<Session, Error>> 
+    fn insert_session<Q: drivers::DatabaseQuerier<'q>>(self, querier: Q, args: InsertSession) 
+        -> BoxFuture<'q, Result<Session, Error>> 
+        where Q: 'q
     {
         Box::pin(async {
             let (sql, arguments) = sql_query::insert_session(args);
             let row = sqlx::query_with(&sql, arguments).fetch_one(querier).await?;
-            Ok(Session::from_row(&row))
+            Session::from_row(&row).map_err(crate::Error::from)
         })
 
     }
 
-    fn find_session_by<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: SessionFilter) -> BoxStream<'b, Result<Session, Error>> 
+    fn find_session_by<Q: drivers::DatabaseQuerier<'q>>(self, _querier: Q, _filter: SessionFilter) 
+        -> BoxStream<'q, Result<Session, Error>> 
+        where  Q: 'q
     {
         todo!()
     }
