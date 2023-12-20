@@ -1,4 +1,4 @@
-use signuis_core::{services::{Database, DatabasePool, DatabasePoolArgs}, config::{Config, ConfigArgs}, Error};
+use signuis_core::{services::database::{DatabasePool, DatabasePoolArgs}, config::{Config, ConfigArgs}, Error};
 use signuis_core::log::{info, error};
 
 #[tokio::main]

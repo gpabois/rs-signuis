@@ -9,13 +9,15 @@ pub mod traits {
 
     use crate::{model::user::{InsertUser, User, UserFilter}, Error, drivers};
 
-    pub trait UserRepository<'q>: Sized + std::marker::Send {
+    pub trait UserRepository<'q>: Sized + std::marker::Send +'q {
         /// Insert a new user
         fn insert_user<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, args: InsertUser) -> BoxFuture<'b, Result<User,Error>>;
         /// Count the number of user
-        fn count_user_by<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, args: UserFilter) -> BoxFuture<'b, Result<i64,Error>>;
+        fn count_user_by<'b, Q: drivers::DatabaseQuerier<'b>+'b>(self, querier: Q, args: UserFilter) -> BoxFuture<'b, Result<i64,Error>> where 'b: 'q;
         /// Check if at least one user match the fiter
-        fn any_users_by<'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, args: UserFilter) -> BoxFuture<'b, Result<bool,Error>> {
+        fn any_users_by<'b: 'q, Q: drivers::DatabaseQuerier<'b> +'b>(self, querier: Q, args: UserFilter) -> BoxFuture<'b, Result<bool,Error>> 
+        where Self: 'b
+        {
             Box::pin(async {
                 let count = self.count_user_by(querier, args).await?;
                 Ok(count > 0)
@@ -43,12 +45,13 @@ impl Into<Cond> for UserFilter {
     }
 }
 
-impl<'q> traits::UserRepository<'q> for &'_ super::Repository {
+impl<'q> traits::UserRepository<'q> for &'q super::Repository {
     fn insert_user<'b, Q: crate::drivers::DatabaseQuerier<'b>>(self, _querier: Q, _args: InsertUser) -> futures::prelude::future::BoxFuture<'b, Result<User,crate::Error>> {
         todo!()
     }
 
-    fn count_user_by<'b, Q: crate::drivers::DatabaseQuerier<'b>>(self, querier: Q, args: UserFilter) -> futures::prelude::future::BoxFuture<'b, Result<i64,crate::Error>> {
+    fn count_user_by<'b, Q: crate::drivers::DatabaseQuerier<'b>+'b>(self, querier: Q, args: UserFilter) -> futures::prelude::future::BoxFuture<'b, Result<i64,crate::Error>> where 'b :'q
+    {
         let cond: Cond = args.into();
         Box::pin(async move {
 

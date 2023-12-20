@@ -1,3 +1,5 @@
+use futures::future::BoxFuture;
+
 use crate::{Error, model::session::Session};
 
 
@@ -17,12 +19,12 @@ pub mod traits {
 
     pub trait Authorization<'q> {
         // The actor behind the session can ?
-        fn can<'a>(self, actor: &Session, action: super::Action) -> BoxFuture<'a, Result<(), Error>>;
+        fn can<'a: 'q+'b, 'b: 'q>(self, actor: &'a Session, action: super::Action) -> BoxFuture<'b, Result<(), Error>>;
     }
 }
 
 impl<'q> traits::Authorization<'q> for &'q mut super::ServiceTx<'_> {
-    fn can<'a>(self, actor: &Session, action: Action) -> futures::prelude::future::BoxFuture<'a, Result<(), Error>> {
+    fn can<'a: 'q+'b, 'b: 'q>(self, actor: &'a Session, action: Action) -> BoxFuture<'b, Result<(), Error>> {
         Box::pin(async move {
             let can = match action {
                 Action::CanRegister => actor.is_anonynmous()

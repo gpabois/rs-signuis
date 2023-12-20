@@ -20,6 +20,7 @@ pub mod traits {
 impl<'q> traits::Account<'q> for &'q mut super::ServiceTx<'_> {
     fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::model::session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
         Box::pin(async {
+            //
             self.can(actor, Action::CanRegister).await?;            
             
             let querier = self.querier.acquire().await?;
