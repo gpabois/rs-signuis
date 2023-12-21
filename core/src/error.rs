@@ -1,3 +1,4 @@
+use log::SetLoggerError;
 use sqlx::migrate::MigrateError;
 
 use crate::Issue;
@@ -8,6 +9,7 @@ pub enum Error {
     MigrationError(MigrateError),
     DatabaseError(sqlx::Error),
     ValidationError(Vec<Issue>),
+    LoggerError(SetLoggerError),
     InvalidCredentials,
     InvalidTokenSession,
     Unauthorized
@@ -38,6 +40,12 @@ impl From<sqlx::migrate::MigrateError> for Error {
     fn from(value: sqlx::migrate::MigrateError) -> Self {
         Self::MigrationError(value)
     } 
+}
+
+impl From<SetLoggerError> for Error {
+    fn from(value: SetLoggerError) -> Self {
+        Self::LoggerError(value)
+    }
 }
 
 impl From<sqlx::Error> for Error {

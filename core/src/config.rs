@@ -51,7 +51,7 @@ impl ConfigArgs {
 
 impl Config {
     /// Initialise configuration
-    pub fn init(args: ConfigArgs) {
+    pub fn init(args: ConfigArgs) -> Result<(), Error> {
         Self::init_logging();
 
         if let Some(mode) = &args.mode {
@@ -77,9 +77,10 @@ impl Config {
             Self::load_env_file(".env");
         }
 
+        Ok(())
     }
 
-    fn init_logging() {
+    fn init_logging() -> Result<(), Error> {
         let stdout = ConsoleAppender::builder().build();
     
         let config = log4rs::config::Config::builder()
@@ -87,7 +88,8 @@ impl Config {
             .build(log4rs::config::Root::builder().appender("stdout").build(log::LevelFilter::Info))
             .unwrap();
     
-        log4rs::init_config(config).unwrap();
+        log4rs::init_config(config)?;
+        Ok(())
     }
 
     fn load_env_file(env_file: &str) -> bool {

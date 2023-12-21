@@ -5,8 +5,8 @@ use signuis_core::services::{Service, ServicePool, ServiceTx};
 use signuis_core::Error;
 use sqlx::{Postgres, Pool};
 
-pub fn setup_config() {
-    Config::init(ConfigArgs::default().set_mode(Mode::Test));
+pub fn setup_config() -> Result<(), Error> {
+    Config::init(ConfigArgs::default().set_mode(Mode::Test))
 }
 
 pub async fn setup_database() -> Result<Pool<Postgres>, Error>{
@@ -21,7 +21,7 @@ pub async fn with_service<F>(with: F)
     -> Result<(), Error> 
     where for<'a, 'f, 'g> F:  std::ops::FnOnce(&'a mut ServiceTx<'g>) -> BoxFuture<'a, Result<(), Error>>
 {
-    setup_config();
+    setup_config()?;
     let pool = setup_database().await?;
     let hub: Service<Pool<Postgres>> = ServicePool::new(pool);
     let mut tx = hub.begin().await?;
