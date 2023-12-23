@@ -4,7 +4,7 @@ use chrono::{Utc, Duration};
 use futures::{future::BoxFuture, TryStreamExt};
 use sqlx::Acquire;
 
-use crate::{Error, model::{session::{Session, SessionFilter, Client}, credentials::{CredentialFilter, Credential}, session::InsertSession}, repositories::{sessions::traits::SessionRepository, credentials::traits::CredentialRepository}};
+use crate::{Error, model::{session::{Session, SessionFilter}, credentials::{CredentialFilter, Credential}, session::InsertSession}, repositories::{sessions::traits::SessionRepository, credentials::traits::CredentialRepository}};
 
 pub mod traits {
     use futures::future::BoxFuture;
@@ -32,9 +32,12 @@ impl<'q> traits::Authentication<'q> for &'q mut super::ServiceTx<'_>
         Box::pin(async {
             let querier = self.querier.acquire().await?;
 
-            let filter = SessionFilter::new()
-                .token_equals(token)
-                .expires_at_time_lower_or_equal(Utc::now());
+            let filter = SessionFilter::and(
+                vec![
+                    SessionFilter::TokenEq(token.into()),
+                    SessionFilter::ExpiresAtGte(Utc::now())
+                ]
+            );
 
             self.repos
                 .find_session_by(querier, filter)
@@ -66,7 +69,7 @@ impl<'q> traits::Authentication<'q> for &'q mut super::ServiceTx<'_>
             stored.verify_credential(credential)?;
 
             let insert = InsertSession::new(actor.client.clone())
-                .set_user_id(&stored.id)
+                .set_user_id(stored.id)
                 .set_expires_in(
                     Utc::now()
                         .add(Duration::hours(8)

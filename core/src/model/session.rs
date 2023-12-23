@@ -1,28 +1,33 @@
-use chrono::Utc;
+use chrono::{Utc, DateTime};
 use sqlx::{FromRow, Row, postgres::PgRow};
+use uuid::Uuid;
 
 use crate::utils::generate_token;
-
-#[derive(Default)]
-pub struct SessionFilter {
-    pub token_eq:       Option<String>,
-    pub expires_lte:    Option<chrono::DateTime<Utc>>,
-    pub ip_eq:          Option<String>
+pub enum SessionFilter {
+    TokenEq(String),
+    ExpiresAtLte(DateTime<Utc>),
+    ExpiresAtGte(DateTime<Utc>),
+    And(Vec<SessionFilter>),
+    Or(Vec<SessionFilter>),
 }
 
-impl SessionFilter {
-    pub fn new() -> Self {
-        Self::default()
+impl SessionFilter 
+{
+
+    pub fn and<I: IntoIterator<Item=Self>>(values: I) -> Self {
+        Self::And(values.into_iter().collect())
     }
 
-    pub fn token_equals(mut self, value: &str) -> Self {
-        self.token_eq = Option::Some(value.into());
-        self
+    pub fn or<I: IntoIterator<Item=Self>>(values: I) -> Self {
+        Self::Or(values.into_iter().collect())
     }
 
-    pub fn expires_at_time_lower_or_equal(mut self, value: chrono::DateTime<Utc>) -> Self {
-        self.expires_lte = Option::Some(value);
-        self
+    pub fn token_equals(value: &str) -> Self {
+        Self::TokenEq(value.into())
+    }
+
+    pub fn expires_at_time_lower_or_equal(value: chrono::DateTime<Utc>) -> Self {
+        Self::ExpiresAtLte(value)
     }
 }
 
@@ -53,11 +58,12 @@ impl<'r> FromRow<'r, PgRow> for SessionClient {
 }
 
 pub struct InsertSession {
-    pub id:         Option<String>,
+    pub id:         Option<Uuid>,
     pub token:      String,
     pub client:     Client,
-    pub user_id:    Option<String>,
-    pub expires_in: chrono::DateTime<Utc>
+    pub user_id:    Option<Uuid>,
+    pub expires_in: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>
 }
 
 impl InsertSession {
@@ -67,7 +73,8 @@ impl InsertSession {
             token,
             client,
             user_id: None,
-            expires_in: Utc::now()    
+            expires_in: Utc::now(),
+            created_at: None  
         }
     }
 
@@ -78,16 +85,17 @@ impl InsertSession {
             token,
             client,
             user_id: None,
-            expires_in: Utc::now()    
+            expires_in: Utc::now(),
+            created_at: None  
         }
     }
 
-    pub fn set_id(mut self, value: &str) -> Self {
+    pub fn set_id<I: Into<Uuid>>(mut self, value: I) -> Self {
         self.id = Some(value.into());
         self       
     }
 
-    pub fn set_user_id(mut self, user_id: &str) -> Self {
+    pub fn set_user_id<I: Into<Uuid>>(mut self, user_id: I) -> Self {
         self.user_id = Some(user_id.into());
         self
     }
@@ -104,7 +112,7 @@ impl InsertSession {
 }
 
 pub struct Session {
-    pub id:     String,
+    pub id:     Option<Uuid>,
     pub client: Client,
     pub user:   Option<UserSession>,
 }
@@ -113,7 +121,7 @@ impl Session {
     /// Create an anonymous session
     pub fn anonymous(client: Client) -> Self {
         Self {
-            id: "anonymous".into(),
+            id: None,
             user: None,
             client
         }
@@ -125,9 +133,9 @@ impl Session {
 }
 
 pub struct UserSession {
-    pub id: String,
-    pub name: String,
-    pub email: String,
+    pub id:     Uuid,
+    pub name:   String,
+    pub email:  String,
     pub avatar: Option<String>
 }
 
@@ -136,7 +144,7 @@ struct OptionalUserSession(Option<UserSession>);
 impl<'r> FromRow<'r, PgRow> for OptionalUserSession
 {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        let user_id = row.try_get::<Option<String>, _>("user_id")?;
+        let user_id = row.try_get::<Option<Uuid>, _>("user_id")?;
         Ok(match user_id {
             None => OptionalUserSession(Option::None),
             Some(id) => OptionalUserSession(Some(UserSession {

@@ -1,6 +1,6 @@
 use async_stream::stream;
 use futures::{stream::BoxStream, StreamExt};
-use sqlx::FromRow;
+use sqlx::{FromRow, postgres::PgRow, Row};
 
 use crate::{model::credentials::{HashedCredential, CredentialFilter}, drivers};
 
@@ -14,6 +14,15 @@ pub mod traits {
         fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
             -> BoxStream<'b, Result<HashedCredential, Error>> 
         where 'a: 'b, 'q: 'b, Q: 'b;
+    }
+}
+
+impl<'r> FromRow<'r, PgRow> for HashedCredential {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            pwd_hash: row.try_get("password")?
+        })
     }
 }
 

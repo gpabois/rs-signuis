@@ -1,5 +1,5 @@
 use futures::future::BoxFuture;
-use signuis_core::{services::ServiceTx, Error};
+use crate::{services::ServiceTx, Error};
 
 pub mod clients;
 pub mod users;

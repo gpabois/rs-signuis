@@ -1,5 +1,5 @@
 use argon2::Argon2;
-use sqlx::{prelude::FromRow, postgres::PgRow, Row};
+use uuid::Uuid;
 
 use super::Identifiable;
 
@@ -22,7 +22,7 @@ impl Into<InsertUser> for RegisterUser {
 }
 
 pub struct InsertUser {
-    pub id:         Option<String>,
+    pub id:         Option<uuid::Uuid>,
     pub name:       String,
     pub email:      String,
     pub password:   Option<String>,
@@ -40,7 +40,7 @@ impl InsertUser {
         }
     }
 
-    pub fn set_id(mut self, id: &str) -> Self {
+    pub fn set_id<I: Into<Uuid>>(mut self, id: I) -> Self {
         self.id = Some(id.into());
         self
     }
@@ -109,27 +109,16 @@ impl UserFilter {
 }
 
 pub struct User {
-    pub id:     String,
+    pub id:     Uuid,
     pub name:   String,
     pub email:  String,
     pub avatar: Option<String>
 }
 
 impl Identifiable for User {
-    type Type= String;
+    type Type= Uuid;
 
     fn id(&self) -> Self::Type {
         self.id.clone()
-    }
-}
-
-impl<'r> FromRow<'r, PgRow> for User {
-    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        Ok(Self {
-            id: row.try_get("id")?,
-            name: row.try_get("name")?,
-            email: row.try_get("email")?,
-            avatar: row.try_get("avatar")?
-        })
     }
 }

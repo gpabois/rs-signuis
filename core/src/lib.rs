@@ -13,3 +13,5 @@ pub mod model;
 pub mod services;
 
 pub use log;
+
+pub mod fixtures;

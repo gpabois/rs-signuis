@@ -1,11 +1,12 @@
 use fake::{faker::internet::fr_fr::{Username, SafeEmail}, Fake};
 use futures::future::BoxFuture;
-use signuis_core::{Error, model::{user::{InsertUser, User}}, services::ServiceTx, repositories::users::traits::UserRepository};
+use crate::{Error, model::user::{InsertUser, User}, services::ServiceTx, repositories::users::traits::UserRepository};
 use sqlx::Acquire;
+use uuid::Uuid;
 
 use super::Fixture;
 pub struct UserFixture {
-    id: Option<String>,
+    id: Option<Uuid>,
     name: Option<String>,
     email: Option<String>,
     password: Option<String>
@@ -17,7 +18,7 @@ impl UserFixture {
     }
 
     pub fn with_id(mut self, value: &str) -> Self {
-        self.id = Some(value.into());
+        self.id = Some(Uuid::parse_str(value).unwrap());
         self        
     }
 
@@ -60,7 +61,7 @@ impl Into<InsertUser> for UserFixture {
         }
 
         if let Some(id) = self.id {
-            args = args.set_id(&id);
+            args = args.set_id(id);
         }
 
         args

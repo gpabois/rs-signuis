@@ -25,6 +25,7 @@ pub async fn with_service<F>(with: F)
     let pool = setup_database().await?;
     let hub: Service<Pool<Postgres>> = ServicePool::new(pool);
     let mut tx = hub.begin().await?;
+    tx.migrate_database().await?;
     with(&mut tx).await?;
     tx.rollback().await?;
     Ok(())

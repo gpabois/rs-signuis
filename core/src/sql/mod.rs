@@ -1,4 +1,35 @@
-use sea_query::Iden;
+use sea_query::{Iden, DynIden, SimpleExpr, IntoIden};
+pub struct ConditionalInsert(Vec<(DynIden, SimpleExpr)>);
+
+impl ConditionalInsert {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn add<I>(&mut self, col: I, value: SimpleExpr) -> &mut Self where I: IntoIden {
+        self.0.push((col.into_iden(), value));
+        self
+    }
+
+    pub fn r#if<I, F>(&mut self, test: bool, col: I, value: F) -> &mut Self where I: IntoIden, F: FnOnce() -> SimpleExpr {
+        if test {
+            self.0.push((col.into_iden(), value()))
+        }
+
+        self
+    }
+
+    pub fn into_tuple(self) -> (Vec<DynIden>, Vec<SimpleExpr>) {
+        let mut t: (Vec<DynIden>, Vec<SimpleExpr>) = (vec![], vec![]);
+
+        self.0.into_iter().for_each(|(c, v)| {
+            t.0.push(c);
+            t.1.push(v)
+        });
+
+        t
+    }
+}
 
 pub enum SessionIden {
     Table,
@@ -7,7 +38,7 @@ pub enum SessionIden {
     Token,
     UserAgent,
     IP,
-    //CreatedAt,
+    CreatedAt,
     ExpiresAt
 }
 
@@ -20,7 +51,7 @@ impl Iden for SessionIden {
             Self::Token => "token",
             Self::UserAgent => "user_agent",
             Self::IP => "ip",
-            //Self::CreatedAt => "created_at",
+            Self::CreatedAt => "created_at",
             Self::ExpiresAt => "expires_at"
         }).unwrap();
     }

@@ -5,10 +5,16 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dev-dependencies]
-fake = { version = "2.9.1", features = ["derive"] }
+[dependencies.uuid]
+version = "1.6.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
 
 [dependencies]
+fake = { version = "2.9.1", features = ["derive"] }
 argon2 = "0.5.2"
 async-stream = "0.3.5"
 async-trait = "0.1.74"
@@ -20,9 +26,9 @@ log = "0.4.20"
 log4rs = "1.2.0"
 password-hash = "0.5.0"
 rand = "0.8.5"
-sea-query = { version = "0.30.5", features = ["with-chrono"] }
-sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres", "with-chrono"] }
-sea-query-postgres =  { version = "0.4.0", features = ["with-chrono"]}
+sea-query = { version = "0.30.5", features = ["with-chrono", "with-uuid"] }
+sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres", "with-chrono", "with-uuid"] }
+sea-query-postgres =  { version = "0.4.0", features = ["with-chrono", "with-uuid"]}
 signals2 = "0.3.3"
 sqlx = { version = "0.7.3", features = ["postgres", "runtime-tokio"] }
 time = "0.3.30"

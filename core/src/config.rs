@@ -52,7 +52,7 @@ impl ConfigArgs {
 impl Config {
     /// Initialise configuration
     pub fn init(args: ConfigArgs) -> Result<(), Error> {
-        Self::init_logging();
+        let _ = Self::init_logging();
 
         if let Some(mode) = &args.mode {
             let str_mode: String = mode.into();

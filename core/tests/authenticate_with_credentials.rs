@@ -3,10 +3,10 @@ use signuis_core::model::session::Session;
 use signuis_core::services::authentication::traits::Authentication;
 use signuis_core::Error;
 
-use crate::fixtures::Fixture;
+use signuis_core::fixtures;
+use signuis_core::fixtures::Fixture;
 
 mod setup;
-mod fixtures;
 
 const USER_ID: &str = "07483c5a-57f1-4f9a-a6f9-49cb961c1eff";
 const USER_NAME: &str = "test_user";

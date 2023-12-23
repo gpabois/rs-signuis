@@ -1,8 +1,7 @@
 use futures::future::BoxFuture;
-use sea_query::{Iden, extension::postgres::Type};
-use signuis_core::{services::ServiceTx, model::Identifiable, Error};
+use crate::{services::ServiceTx, model::Identifiable, Error};
 
-use super::{users::UserFixture, Fixture};
+use super::Fixture;
 
 pub enum ForeignKeyFixture<ID, F> {
     ID(ID),

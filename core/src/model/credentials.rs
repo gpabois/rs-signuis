@@ -1,4 +1,4 @@
-use sqlx::{postgres::PgRow, FromRow};
+use uuid::Uuid;
 
 use crate::Error;
 
@@ -14,15 +14,10 @@ impl Credential {
 }
 
 pub struct HashedCredential {
-    pub id: String,
+    pub id: Uuid,
     pub pwd_hash: String   
 }
 
-impl<'r> FromRow<'r, PgRow> for HashedCredential {
-    fn from_row(_row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        todo!()
-    }
-}
 
 impl HashedCredential {
     pub fn verify_credential(&self, credential: Credential) -> Result<(), Error> {

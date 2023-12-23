@@ -1,12 +1,11 @@
 use std::ops::Add;
 
 use chrono::{Utc, Duration};
-use signuis_core::{model::session::InsertSession, services::authentication::traits::Authentication};
+use signuis_core::services::authentication::traits::Authentication;
 
 mod setup;
-mod fixtures;
-
-use fixtures::Fixture;
+use signuis_core::fixtures;
+use signuis_core::fixtures::Fixture;
 
 #[tokio::test]
 async fn check_session_token_with_valid_token() -> Result<(), signuis_core::Error> {
@@ -17,6 +16,7 @@ async fn check_session_token_with_valid_token() -> Result<(), signuis_core::Erro
         Box::pin(async move{
             let session = fixtures::sessions::SessionFixture::new()
                                 .with_token(token)
+                                .with_expires_at(Utc::now().add(Duration::hours(1)))
                                 .into_entity(tx)
                                 .await?;
             
@@ -36,10 +36,10 @@ async fn check_session_token_with_invalid_token() -> Result<(), signuis_core::Er
 
     setup::with_service(|tx| {
         Box::pin(async move{
-            let session = fixtures::sessions::SessionFixture::new()
-                                .with_token(token)
-                                .into_entity(tx)
-                                .await?;
+            fixtures::sessions::SessionFixture::new()
+                .with_token(token)
+                .into_entity(tx)
+                .await?;
             
             let result = tx.check_session_token("fake_token").await;
 
@@ -66,7 +66,6 @@ async fn check_session_token_with_expired_session() -> Result<(), signuis_core::
             
             let result = tx.check_session_token(token).await;
             assert_eq!(result.is_err(), true);
-    
             Ok(())
         })
     }).await
