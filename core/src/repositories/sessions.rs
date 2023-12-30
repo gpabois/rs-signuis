@@ -2,9 +2,10 @@ use async_stream::stream;
 use futures::{stream::BoxStream, future::BoxFuture, StreamExt};
 use sea_query::{Cond, InsertStatement, Query, ReturningClause, Returning, SelectStatement, IntoIden, Alias, Expr, IntoCondition, PostgresQueryBuilder};
 use sea_query_binder::SqlxBinder;
-use sqlx::FromRow;
+use sqlx::{FromRow, postgres::PgRow, Row};
+use uuid::Uuid;
 
-use crate::{model::session::{Session, SessionFilter, InsertSession}, drivers, Error, sql::{ConditionalInsert, SessionIden, UserIden}};
+use crate::{model::session::{Session, SessionFilter, InsertSession, SessionClient, SessionUser}, drivers, Error, sql::{ConditionalInsert, SessionIden, UserIden}};
 
 pub mod traits {
     use futures::{stream::BoxStream, future::BoxFuture};
@@ -23,18 +24,15 @@ pub mod traits {
 
 impl Into<ConditionalInsert> for InsertSession {
     fn into(self) -> ConditionalInsert {
-        let mut cond = ConditionalInsert::new();
-
-        cond
+        ConditionalInsert::new()
         .r#if(self.id.is_some(), SessionIden::ID, || self.id.unwrap().into())
         .add(SessionIden::Token, self.token.into())
-        .add(SessionIden::IP, self.client.ip.into())
-        .add(SessionIden::UserAgent, self.client.user_agent.into())
+        .add(SessionIden::ClientIp, self.client.ip.into())
+        .add(SessionIden::ClientUserAgent, self.client.user_agent.into())
         .r#if(self.user_id.is_some(), SessionIden::UserID, || self.user_id.unwrap().into())
         .add( SessionIden::ExpiresAt, self.expires_in.into())
-        .r#if(self.created_at.is_some(), SessionIden::CreatedAt, || self.created_at.unwrap().into());
-
-        cond
+        .r#if(self.created_at.is_some(), SessionIden::CreatedAt, || self.created_at.unwrap().into())
+        .to_owned()
     }
 }
 
@@ -67,8 +65,8 @@ impl Session {
         .from(table_iden.clone())
         .left_join(UserIden::Table, Expr::col((UserIden::Table, UserIden::ID)).equals((table_iden.clone(), SessionIden::UserID)))
         .expr_as(Expr::col((table_iden.clone(), SessionIden::ID)), Alias::new("session_id"))
-        .expr_as(Expr::col((table_iden.clone(), SessionIden::IP)), Alias::new("client_ip"))
-        .expr_as(Expr::col((table_iden.clone(), SessionIden::UserAgent)), Alias::new("client_user_agent"))
+        .expr_as(Expr::col((table_iden.clone(), SessionIden::ClientIp)), Alias::new("client_ip"))
+        .expr_as(Expr::col((table_iden.clone(), SessionIden::ClientUserAgent)), Alias::new("client_user_agent"))
         .expr_as(Expr::col((UserIden::Table, UserIden::ID)), Alias::new("user_id"))
         .expr_as(Expr::col((UserIden::Table, UserIden::Name)), Alias::new("user_name"))
         .expr_as(Expr::col((UserIden::Table, UserIden::Email)), Alias::new("user_email"))
@@ -86,8 +84,8 @@ impl Session {
         Returning::new().columns([
             SessionIden::ID, 
             SessionIden::UserID, 
-            SessionIden::UserAgent,
-            SessionIden::IP
+            SessionIden::ClientUserAgent,
+            SessionIden::ClientIp
         ])
     }
 }
@@ -118,6 +116,52 @@ impl Into<Cond> for SessionFilter {
         }
     }
 }
+
+impl<'r> FromRow<'r, PgRow> for SessionClient {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            ip: row.try_get("client_ip")?,
+            user_agent: row.try_get("client_user_agent")?
+        })
+    }
+}
+
+
+struct OptionalUserSession(Option<SessionUser>);
+
+impl<'r> FromRow<'r, PgRow> for OptionalUserSession
+{
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        let user_id = row.try_get::<Option<Uuid>, _>("user_id")?;
+        Ok(match user_id {
+            None => OptionalUserSession(Option::None),
+            Some(id) => OptionalUserSession(Some(SessionUser {
+                id,
+                name: row.get("user_name"),
+                email: row.get("user_email"),
+                avatar: row.get("user_avatar")
+            }))
+        })
+    }
+}
+
+impl Into<Option<SessionUser>> for OptionalUserSession {
+    fn into(self) -> Option<SessionUser> {
+        self.0
+    }
+}
+
+impl<'r> FromRow<'r, PgRow> for Session 
+{
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Result::Ok(Session {
+            id: row.try_get("session_id")?,
+            client: SessionClient::from_row(row)?,
+            user: OptionalUserSession::from_row(row)?.into()
+        })
+    }
+}
+
 
 mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, PostgresQueryBuilder, InsertStatement};

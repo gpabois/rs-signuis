@@ -2,6 +2,8 @@ pub mod database;
 pub mod account;
 pub mod authentication;
 pub mod authorization;
+pub mod logger;
+pub mod reporting;
 
 use sqlx::{Postgres, Pool, Transaction};
 

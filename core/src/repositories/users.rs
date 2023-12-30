@@ -64,7 +64,13 @@ impl Into<InsertStatement> for InsertUser {
     fn into(self) -> InsertStatement {
         let cond: ConditionalInsert = self.into();
         let (columns, values) = cond.into_tuple();
-        Query::insert().into_table(UserIden::Table).columns(columns).values(values).unwrap().to_owned()
+        
+        Query::insert()
+            .into_table(UserIden::Table)
+            .columns(columns)
+            .values(values)
+            .unwrap()
+            .to_owned()
     }
 }
 
@@ -109,7 +115,8 @@ impl<'q> traits::UserRepository<'q> for &'q super::Repository {
         Box::pin(async move {
 
             let (sql, arguments) = Query::select()
-                .expr_as(Func::count(Expr::col(UserIden::ID)), Alias::new("count"))
+                .from(UserIden::Table)
+                .expr_as(Func::count(Expr::col((UserIden::Table, UserIden::ID))), Alias::new("count"))
                 .cond_where(cond)
                 .build_sqlx(PostgresQueryBuilder);
 

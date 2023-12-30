@@ -7,7 +7,7 @@ create table reports (
     user_id     UUID,
     created_at  timestamp with time zone default now(),
     location    geometry,
-    intensity   smallint,
+    intensity   "char",
     -- constraints --
     constraint fk_family foreign key(type_id) references nuisance_types(id),
     constraint fk_user   foreign key(user_id) references users(id)

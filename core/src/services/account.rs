@@ -1,7 +1,7 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::{model::user::{RegisterUser, User, UserFilter, InsertUser}, Error, Issue, Issues, repositories::users::traits::UserRepository};
+use crate::{model::user::{RegisterUser, User, UserFilter, InsertUser}, Error, Issue, Issues, repositories::users::traits::UserRepository, Validator};
 use crate::services::authorization::traits::Authorization;
 
 use super::authorization::Action;
@@ -17,32 +17,69 @@ pub mod traits {
     }
 }
 
+impl Validator for &'_ RegisterUser {
+    fn validate(self, issues: &mut Issues) {
+        issues.email(&self.email, 
+            Issue::new(
+                "invalid_form".into(), 
+                "Email invalide".into(), 
+                vec!["email".into()]
+            )
+        );
+
+        issues.eq(&self.password, &self.confirm_password, Issue::new(
+            "invalid_form".into(), 
+            "Les mots de passe ne sont pas égaux".into(), 
+            vec!["confirm_password".into()]
+        ));
+
+        issues.not_empty(&self.password, Issue::new(
+            "invalid_form".into(), 
+            "Le mot de passe ne doit pas être vide".into(), 
+            vec!["password".into()]
+        ));
+
+        issues.not_empty(&self.name, Issue::new(
+            "invalid_form".into(), 
+            "Le nom d'utilisateur ne doit pas être vide".into(), 
+            vec!["name".into()]
+        ));
+
+
+    }
+}
+
 impl<'q> traits::Account<'q> for &'q mut super::ServiceTx<'_> {
     fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::model::session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
         Box::pin(async {
-            //
+            // Check if the actor can register a user.
             self.can(actor, Action::CanRegister).await?;            
-            
-            let querier = self.querier.acquire().await?;
-            
+        
+            // Validate the arguments
             let mut issues = Issues::new();
-            issues.async_add_if_not_true(self.repos.any_users_by(&mut *querier, UserFilter::name(&args.name)), Issue::new(
-                "form".into(),
+            args.validate(&mut issues);
+            issues.assert_valid()?; // Avoid a round to the database.
+
+            // Additional checks such as exiting name and email.
+            let querier = self.querier.acquire().await?;
+            issues.async_true(self.repos.any_users_by(&mut *querier, UserFilter::name(&args.name)), Issue::new(
+                "invalid_form".into(),
                 "Le nom d'utilisateur est déjà pris.".into(),
                 vec!["name".into()]
             )).await?;
 
-            issues.async_add_if_not_true(self.repos.any_users_by(&mut *querier, UserFilter::email(&args.email)), Issue::new(
-                "form".into(),
+            issues.async_true(self.repos.any_users_by(&mut *querier, UserFilter::email(&args.email)), Issue::new(
+                "invalid_form".into(),
                 "L'email est déjà pris.".into(),
                 vec!["email".into()]
             )).await?;
+            issues.assert_valid()?;
 
-            
-            issues.validate()?;
-
+            // We can insert a new user into the database.
             let insert: InsertUser = args.into();
-            self.repos.insert_user(querier, insert).await
+            self.repos
+            .insert_user(querier, insert)
+            .await
         })
     }
 }

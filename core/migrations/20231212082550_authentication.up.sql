@@ -22,8 +22,8 @@ create table sessions (
     id          uuid primary key not null default uuid_generate_v4(),
     ------------
     -- client --
-    ip          varchar(39) not null,
-    user_agent  varchar(255) not null,
+    client_ip          varchar(39) not null,
+    client_user_agent  varchar(255) not null,
     ------------
     user_id     uuid,
     token       varchar(255),
@@ -33,5 +33,5 @@ create table sessions (
     constraint fk_users foreign key(user_id) references users(id)
 );
 
-create unique index sessions_unique_token on sessions (token) include (user_id, ip);
-create index sessions_ip on sessions (ip);
+create unique index sessions_unique_token on sessions (token) include (user_id, client_ip);
+create index sessions_ip on sessions (client_ip);

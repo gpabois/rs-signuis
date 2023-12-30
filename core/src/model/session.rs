@@ -1,8 +1,9 @@
 use chrono::{Utc, DateTime};
-use sqlx::{FromRow, Row, postgres::PgRow};
 use uuid::Uuid;
 
 use crate::utils::generate_token;
+
+use super::client::Client;
 pub enum SessionFilter {
     TokenEq(String),
     ExpiresAtLte(DateTime<Utc>),
@@ -31,36 +32,13 @@ impl SessionFilter
     }
 }
 
-#[derive(Clone)]
-pub struct Client {
-    pub ip: String,
-    pub user_agent: String
-}
-
-impl Client {
-    pub fn new(ip: &str, user_agent: &str) -> Self {
-        Self{
-            ip: ip.into(),
-            user_agent: user_agent.into()
-        }
-    }
-}
 
 pub type SessionClient = Client;
-
-impl<'r> FromRow<'r, PgRow> for SessionClient {
-    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        Ok(Self {
-            ip: row.try_get("client_ip")?,
-            user_agent: row.try_get("client_user_agent")?
-        })
-    }
-}
 
 pub struct InsertSession {
     pub id:         Option<Uuid>,
     pub token:      String,
-    pub client:     Client,
+    pub client:     SessionClient,
     pub user_id:    Option<Uuid>,
     pub expires_in: DateTime<Utc>,
     pub created_at: Option<DateTime<Utc>>
@@ -114,7 +92,7 @@ impl InsertSession {
 pub struct Session {
     pub id:     Option<Uuid>,
     pub client: Client,
-    pub user:   Option<UserSession>,
+    pub user:   Option<SessionUser>,
 }
 
 impl Session {
@@ -132,44 +110,10 @@ impl Session {
     }
 }
 
-pub struct UserSession {
+#[derive(Clone)]
+pub struct SessionUser {
     pub id:     Uuid,
     pub name:   String,
     pub email:  String,
     pub avatar: Option<String>
-}
-
-struct OptionalUserSession(Option<UserSession>);
-
-impl<'r> FromRow<'r, PgRow> for OptionalUserSession
-{
-    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        let user_id = row.try_get::<Option<Uuid>, _>("user_id")?;
-        Ok(match user_id {
-            None => OptionalUserSession(Option::None),
-            Some(id) => OptionalUserSession(Some(UserSession {
-                id,
-                name: row.get("user_name"),
-                email: row.get("user_email"),
-                avatar: row.get("user_avatar")
-            }))
-        })
-    }
-}
-
-impl Into<Option<UserSession>> for OptionalUserSession {
-    fn into(self) -> Option<UserSession> {
-        self.0
-    }
-}
-
-impl<'r> FromRow<'r, PgRow> for Session 
-{
-    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        Result::Ok(Session {
-            id: row.try_get("session_id")?,
-            client: SessionClient::from_row(row)?,
-            user: OptionalUserSession::from_row(row)?.into()
-        })
-    }
 }

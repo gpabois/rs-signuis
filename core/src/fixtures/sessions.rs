@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use crate::{model::session::{Client, InsertSession, Session}, services::ServiceTx, repositories::sessions::traits::SessionRepository, Error};
+use crate::{model::session::{InsertSession, Session, SessionClient}, services::ServiceTx, repositories::sessions::traits::SessionRepository, Error};
 use sqlx::Acquire;
 use uuid::Uuid;
 
@@ -10,7 +10,7 @@ use super::{users::UserFixture, Fixture, rel::ForeignKeyFixture};
 pub struct SessionFixture {
     id: Option<Uuid>,
     token: Option<String>,
-    client: Option<Client>,
+    client: Option<SessionClient>,
     user_id: Option<ForeignKeyFixture<Uuid, UserFixture>>,
     expires_in: Option<DateTime<Utc>>
 }
@@ -90,4 +90,9 @@ pub async fn new_session(tx: &mut ServiceTx<'_>) -> Result<Session, Error> {
 
 pub async fn new_session_with(tx: &mut ServiceTx<'_>, args: SessionFixture) -> Result<Session, Error>{
     args.into_entity(tx).await
+}
+
+pub fn new_anonymous_session() -> Session {
+    let client = super::clients::new_client();
+    Session::anonymous(client)
 }

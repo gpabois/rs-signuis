@@ -1,3 +1,8 @@
+use std::ops::Add;
+
+use chrono::Duration;
+use chrono::Utc;
+use signuis_core::fixtures::logs::LogFixture;
 use signuis_core::model::credentials::Credential;
 use signuis_core::model::session::Session;
 use signuis_core::services::authentication::traits::Authentication;
@@ -131,6 +136,46 @@ async fn authenticate_with_credentials_with_no_password() -> Result<(), Error> {
             let result = {
                 tx.authenticate_with_credentials(
                     Credential::new(USER_NAME, "wrong_password"),
+                    &Session::anonymous(client)
+                ).await
+            };
+
+            assert_eq!(result.is_err(), true);
+            Ok(())
+        })
+    }).await
+}
+
+
+#[tokio::test]
+async fn authenticate_with_reached_attempt() -> Result<(), Error> {
+    setup::with_service(|tx| {
+        Box::pin(async move {
+            let client = fixtures::clients::new_client();
+
+            fixtures::users::new_user_with(
+                &mut *tx,
+                fixtures::users::UserFixture::new()
+                    .with_id(USER_ID)
+                    .with_name(USER_NAME)
+                    .with_email(USER_EMAIL)
+                    .with_password(USER_PASSWORD)
+            ).await?;
+
+            // Make 3 attempts in less than 15 mn.
+            let mut log = LogFixture::new()
+            .with_client(client.clone())
+            .with_type("authentication::failed")
+            .to_owned();
+
+            fixtures::logs::new_log_with(&mut *tx, log.with_at(Utc::now().add(Duration::minutes(-3))).to_owned()).await?;
+            fixtures::logs::new_log_with(&mut *tx, log.with_at(Utc::now().add(Duration::minutes(-6))).to_owned()).await?;
+            fixtures::logs::new_log_with(&mut *tx, log.with_at(Utc::now().add(Duration::minutes(-9))).to_owned()).await?;
+
+            // Check the credentials, and returns a session
+            let result = {
+                tx.authenticate_with_credentials(
+                    Credential::new(USER_NAME, USER_PASSWORD),
                     &Session::anonymous(client)
                 ).await
             };

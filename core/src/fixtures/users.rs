@@ -5,6 +5,7 @@ use sqlx::Acquire;
 use uuid::Uuid;
 
 use super::Fixture;
+#[derive(Clone)]
 pub struct UserFixture {
     id: Option<Uuid>,
     name: Option<String>,

@@ -4,9 +4,10 @@ use uuid::Uuid;
 use super::Identifiable;
 
 pub struct RegisterUser {
-    pub name:       String,
-    pub email:      String,
-    pub password:   String
+    pub name:             String,
+    pub email:            String,
+    pub password:         String,
+    pub confirm_password: String
 }
 
 impl Into<InsertUser> for RegisterUser {

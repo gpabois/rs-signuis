@@ -5,15 +5,30 @@ use sqlx::{FromRow, postgres::PgRow, Row};
 use crate::{model::credentials::{HashedCredential, CredentialFilter}, drivers};
 
 pub mod traits {
-    use futures::stream::BoxStream;
+    use futures::{stream::BoxStream, TryStreamExt, future::BoxFuture};
 
     use crate::{model::credentials::{HashedCredential, CredentialFilter}, Error, drivers};
 
-    pub trait CredentialRepository<'q> {
-        // Find one credential based on the user's ID.
+    pub trait CredentialRepository<'q>: Sized + std::marker::Send {
+        // Find credentials based on a filter
         fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
             -> BoxStream<'b, Result<HashedCredential, Error>> 
         where 'a: 'b, 'q: 'b, Q: 'b;
+
+        // Find one credential based on the filter
+        fn find_one_credential_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
+        -> BoxFuture<'b, Result<Option<HashedCredential>, Error>> 
+        where 'a: 'b, 'q: 'b, Q: 'b, Self: 'b {
+            Box::pin(async {
+                self.find_credentials_by(
+                    querier, // Explicit reborrow
+                    filter
+                )
+                .try_next()
+                .await
+            })
+
+        }
     }
 }
 

@@ -5,7 +5,7 @@ create table nuisance_families (
     description text
 );
 
-create index nuisance_families_labels on nuisance_families (label);
+create unique index nuisance_families_labels on nuisance_families (label);
 
 create table nuisance_types (
     id uuid primary key not null default uuid_generate_v4(),
@@ -16,4 +16,4 @@ create table nuisance_types (
     constraint fk_family foreign key(family_id) references nuisance_families(id)
 );
 
-create index nuisance_types_labels on nuisance_types (label);
+create unique index nuisance_types_labels on nuisance_types (family_id, label);

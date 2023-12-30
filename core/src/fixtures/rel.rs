@@ -3,9 +3,16 @@ use crate::{services::ServiceTx, model::Identifiable, Error};
 
 use super::Fixture;
 
+#[derive(Clone)]
 pub enum ForeignKeyFixture<ID, F> {
     ID(ID),
     Fixture(F)
+}
+
+impl<ID, F> Default for ForeignKeyFixture<ID, F> where F: Default {
+    fn default() -> Self {
+        Self::Fixture(F::default())
+    }
 }
 
 impl<F> From<&'_ str> for ForeignKeyFixture<String, F> {

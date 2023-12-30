@@ -30,7 +30,7 @@ async fn main() -> Result<(), Error> {
 
 /// Migrate the database
 async fn migrate_database() -> Result<(), Error> {
-    Config::init(ConfigArgs::default());
+    Config::init(ConfigArgs::default())?;
     let database_url = Config::try_get_database_url()?;
     info!(target: "signuis::cli", "Migrating...");
     let db = DatabasePool::new(DatabasePoolArgs::new(database_url.as_str())).await?;
@@ -42,7 +42,7 @@ async fn migrate_database() -> Result<(), Error> {
 
 /// Revert the database
 async fn revert_database() -> Result<(), Error> {
-    Config::init(ConfigArgs::default());
+    Config::init(ConfigArgs::default())?;
     let database_url = Config::try_get_database_url()?;
     info!(target: "signuis::cli", "Reverting...");
     let db = DatabasePool::new(DatabasePoolArgs::new(database_url.as_str())).await?;
