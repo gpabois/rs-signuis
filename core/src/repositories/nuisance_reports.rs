@@ -1,8 +1,7 @@
 use futures::future::BoxFuture;
 use geojson::Geometry;
-use log::info;
 use sea_query::{Expr, SimpleExpr, InsertStatement, Query, ReturningClause, Returning, IntoIden, Alias, SelectStatement};
-use sqlx::{postgres::{PgRow, PgColumn}, Row};
+use sqlx::{postgres::PgRow, Row};
 
 use crate::{sql::{ConditionalInsert, ReportIden, UserIden, NuisanceTypeIden, NuisanceFamilyIden}, model::report::{InsertNuisanceReport, NuisanceReport, ReportNuisanceType, NuisanceReportFamily, ReportUser}, Error, drivers};
 

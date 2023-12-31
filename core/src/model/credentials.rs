@@ -20,10 +20,10 @@ pub struct HashedCredential {
 
 
 impl HashedCredential {
-    pub fn verify_credential(&self, credential: Credential) -> Result<(), Error> {
+    pub fn verify_credential(&self, credential: &Credential) -> Result<(), Error> {
         let pwd_hash = password_hash::PasswordHash::new(&self.pwd_hash).expect("invalid password hash");
         
-        if let Result::Err(_) = pwd_hash.verify_password(&[&argon2::Argon2::default()], credential.password) {
+        if let Result::Err(_) = pwd_hash.verify_password(&[&argon2::Argon2::default()], credential.password.clone()) {
             return Error::invalid_credentials().into();
         }
 

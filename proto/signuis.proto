@@ -2,13 +2,36 @@ syntax = "proto3";
 package signuis;
 
 service Authentication {
-    rpc check_token (CheckTokenRequest) returns (CheckTokenResult);
+    rpc authenticate_with_credential (Credential) returns (AuthenticationResult);
 };
 
-message CheckTokenRequest {
-    string token = 1;
+message Credential {
+    string name_or_email = 1;
+    string password = 2;
 }
 
-message CheckTokenResult {
+message Issue {
+    string code = 1;
+    string message = 2;
+    repeated string path = 3;
+}
+
+message Issues {
+    repeated Issue issues = 1;
+}
+
+message Error {
+    string code = 1;
+    oneof args {
+        string message = 2;
+        Issues issues = 3;
+    }
+}
+
+message AuthenticationResult {
     bool ok = 1;
+    oneof args {
+        string token = 2;
+        Error error = 3;
+    }
 }

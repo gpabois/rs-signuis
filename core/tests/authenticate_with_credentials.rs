@@ -35,7 +35,7 @@ async fn authenticate_with_credentials_with_name_and_valid_password() -> Result<
 
             // Check the credentials, and returns a session
             let session = tx.authenticate_with_credentials(
-                Credential::new(USER_NAME, USER_PASSWORD),
+                &Credential::new(USER_NAME, USER_PASSWORD),
                 &Session::anonymous(client)
             ).await?;
 
@@ -70,7 +70,7 @@ async fn authenticate_with_credentials_with_email_and_valid_password() -> Result
 
             // Check the credentials, and returns a session
             let session = tx.authenticate_with_credentials(
-                Credential::new(USER_EMAIL, USER_PASSWORD),
+                &Credential::new(USER_EMAIL, USER_PASSWORD),
                 &Session::anonymous(client)
             ).await?;
 
@@ -106,7 +106,7 @@ async fn authenticate_with_credentials_with_invalid_password() -> Result<(), Err
             // Check the credentials, and returns a session
             let result = {
                 tx.authenticate_with_credentials(
-                    Credential::new(USER_NAME, "wrong_password"),
+                    &Credential::new(USER_NAME, "wrong_password"),
                     &Session::anonymous(client)
                 ).await
             };
@@ -135,7 +135,7 @@ async fn authenticate_with_credentials_with_no_password() -> Result<(), Error> {
             // Check the credentials, and returns a session
             let result = {
                 tx.authenticate_with_credentials(
-                    Credential::new(USER_NAME, "wrong_password"),
+                    &Credential::new(USER_NAME, "wrong_password"),
                     &Session::anonymous(client)
                 ).await
             };
@@ -175,7 +175,7 @@ async fn authenticate_with_reached_attempt() -> Result<(), Error> {
             // Check the credentials, and returns a session
             let result = {
                 tx.authenticate_with_credentials(
-                    Credential::new(USER_NAME, USER_PASSWORD),
+                    &Credential::new(USER_NAME, USER_PASSWORD),
                     &Session::anonymous(client)
                 ).await
             };

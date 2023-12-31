@@ -19,8 +19,8 @@ pub mod traits {
             -> BoxFuture<'b, Result<Session, Error>> where 'a :'b, 'q: 'b;
 
         /// Check credentials, and returns a user session if valid.
-        fn authenticate_with_credentials<'a, 'b>(self, credential: Credential, actor: &'a Session) 
-            -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'q: 'b;
+        fn authenticate_with_credentials<'a, 'b, 'c>(self, credential: &'c Credential, actor: &'a Session) 
+            -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'c: 'b, 'q: 'b;
     }
 }
 
@@ -46,7 +46,7 @@ impl<'q> traits::Authentication<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 
-    fn authenticate_with_credentials<'a, 'b>(self, credential: Credential, actor: &'a Session) 
+    fn authenticate_with_credentials<'a, 'b, 'c: 'b>(self, credential: &'c Credential, actor: &'a Session) 
         -> BoxFuture<'b, Result<Session, Error>> 
         where 'a : 'b, 'q: 'b {
         
