@@ -1,5 +1,6 @@
-use fake::{faker::internet::fr_fr::{Username, SafeEmail}, Fake};
-use futures::future::BoxFuture;
+use async_stream::stream;
+use fake::{faker::internet::en::{Username, FreeEmail}, Fake};
+use futures::{future::BoxFuture, stream::BoxStream};
 use crate::{Error, model::user::{InsertUser, User}, services::ServiceTx, repositories::users::traits::UserRepository};
 use sqlx::Acquire;
 use uuid::Uuid;
@@ -53,8 +54,8 @@ impl super::Fixture for UserFixture {
 impl Into<InsertUser> for UserFixture {
     fn into(self) -> InsertUser {
         let mut args = InsertUser::new(
-            &self.name.unwrap_or(Username().fake()),
-            &self.email.unwrap_or(SafeEmail().fake())
+            &self.name.unwrap_or(Username().fake_with_rng(&mut rand::thread_rng())),
+            &self.email.unwrap_or(FreeEmail().fake_with_rng(&mut rand::thread_rng()))
         );
 
         if let Some(pwd) = self.password {
@@ -76,4 +77,18 @@ pub async fn new_user<'q>(tx: &mut ServiceTx<'q>) -> Result<User, Error> {
 
 pub async fn new_user_with<'q>(tx: &mut ServiceTx<'q>, args: UserFixture) -> Result<User, Error> {
     args.into_entity(tx).await
+}
+
+pub fn new_multi<'a, 'b, 'q>(tx: &'a mut ServiceTx<'q>) -> BoxStream<'b, Result<User, Error>> 
+    where 'a: 'b
+{
+    Box::pin(stream! {loop {
+        yield UserFixture::new().into_entity(tx).await
+    }})
+}
+
+pub fn new_multi_with<'q, F: Fn() -> UserFixture + Send + 'q>(tx: &'q mut ServiceTx<'q>, f: F) -> BoxStream<'q, Result<User, Error>> {
+    Box::pin(stream! {loop {
+        yield f().into_entity(tx).await
+    }})
 }

@@ -30,7 +30,7 @@ create table sessions (
     created_at  timestamp with time zone default now(),
     expires_at  timestamp with time zone not null,
     -- Foreign key to user --
-    constraint fk_users foreign key(user_id) references users(id)
+    constraint fk_users foreign key(user_id) references users(id) on delete cascade
 );
 
 create unique index sessions_unique_token on sessions (token) include (user_id, client_ip);

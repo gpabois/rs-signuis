@@ -1,5 +1,6 @@
-use fake::{faker::lorem::fr_fr::{Paragraph, Word}, Fake};
-use futures::future::BoxFuture;
+use async_stream::stream;
+use fake::{faker::lorem::en::{Paragraph, Word}, Fake};
+use futures::{future::BoxFuture, stream::BoxStream};
 use sqlx::Acquire;
 use uuid::Uuid;
 
@@ -71,8 +72,8 @@ impl Into<InsertNuisanceType> for NuisanceTypeFixture {
     fn into(self) -> InsertNuisanceType {
         InsertNuisanceType {
             id: self.id,
-            label: self.label.unwrap_or_else(|| Word().fake()),
-            description: self.description.unwrap_or_else(|| Paragraph(30..120).fake()),
+            label: self.label.unwrap_or_else(|| Paragraph(2..4).fake_with_rng(&mut rand::thread_rng())),
+            description: self.description.unwrap_or_else(|| Paragraph(30..120).fake_with_rng(&mut rand::thread_rng())),
             family_id: self
                 .family_id
                 .unwrap()
@@ -91,4 +92,14 @@ impl super::Fixture for NuisanceTypeFixture {
             tx.repos.insert_nuisance_type(querier, self).await
         })
     }
+}
+
+pub fn new_multi_with<'a, 'b, 'q, F: Fn() -> NuisanceTypeFixture + Send + 'b>(tx: &'a mut ServiceTx<'q>, f: F) -> BoxStream<'b, Result<NuisanceType, Error>> 
+where 'a: 'b
+{
+    Box::pin(stream! {
+        loop {
+            yield f().into_entity(tx).await
+        }
+    })
 }

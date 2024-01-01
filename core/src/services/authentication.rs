@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::{ops::Add, borrow::BorrowMut};
 use chrono::{Utc, Duration};
 use futures::{future::BoxFuture, TryStreamExt};
 use sqlx::Acquire;
@@ -16,17 +16,20 @@ pub mod traits {
     pub trait Authentication<'q> {
         /// Verify the token, returns a user session if the token is valid.
         fn check_session_token<'a, 'b>(self, token: &'a str) 
-            -> BoxFuture<'b, Result<Session, Error>> where 'a :'b, 'q: 'b;
+            -> BoxFuture<'b, Result<Session, Error>> 
+        where 'a :'b, 'q: 'b;
 
         /// Check credentials, and returns a user session if valid.
         fn authenticate_with_credentials<'a, 'b, 'c>(self, credential: &'c Credential, actor: &'a Session) 
-            -> BoxFuture<'b, Result<Session, Error>> where 'a: 'b, 'c: 'b, 'q: 'b;
+            -> BoxFuture<'b, Result<Session, Error>> 
+        where 'a: 'b, 'c: 'b, 'q: 'b;
     }
 }
 
 impl<'q> traits::Authentication<'q> for &'q mut super::ServiceTx<'_> {
     fn check_session_token<'a, 'b>(self, token: &'a str) 
-        -> BoxFuture<'b, Result<Session, Error>> where 'a : 'b, 'q: 'b
+        -> BoxFuture<'b, Result<Session, Error>> 
+    where 'a : 'b, 'q: 'b
     {
         Box::pin(async {
             let querier = self.querier.acquire().await?;
@@ -39,7 +42,7 @@ impl<'q> traits::Authentication<'q> for &'q mut super::ServiceTx<'_> {
             );
 
             self.repos
-                .find_session_by(querier, filter)
+                .find_session_by(querier.borrow_mut(), filter)
                 .try_next()
                 .await?
                 .ok_or(Error::invalid_credentials())

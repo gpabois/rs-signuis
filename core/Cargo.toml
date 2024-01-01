@@ -29,7 +29,6 @@ rand = "0.8.5"
 sea-query = { version = "0.30.5", features = ["with-chrono", "with-uuid"] }
 sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres", "with-chrono", "with-uuid"] }
 sea-query-postgres =  { version = "0.4.0", features = ["with-chrono", "with-uuid"]}
-signals2 = "0.3.3"
 sqlx = { version = "0.7.3", features = ["postgres", "runtime-tokio"] }
 time = "0.3.30"
 tokio = { version = "1.35.0", features = ["test-util", "rt", "macros"] }

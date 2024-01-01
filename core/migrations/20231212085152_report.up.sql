@@ -9,8 +9,8 @@ create table reports (
     location    geometry,
     intensity   "char",
     -- constraints --
-    constraint fk_family foreign key(type_id) references nuisance_types(id),
-    constraint fk_user   foreign key(user_id) references users(id)
+    constraint fk_family foreign key(type_id) references nuisance_types(id) on delete cascade,
+    constraint fk_user   foreign key(user_id) references users(id) on delete cascade
 );
 
 create index reports_locations on reports using GIST(location);

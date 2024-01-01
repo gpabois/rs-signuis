@@ -84,7 +84,7 @@ impl codegen::authentication_server::Authentication for Authentication {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    signuis_core::config::Config::init(Default::default()).unwrap();
+    signuis_core::config::Config::init_with_args(Default::default()).unwrap();
 
     let addr = "[::1]:5051".parse()?;
     let pool = signuis_core::services::ServicePool::from_config().await.unwrap();
@@ -96,6 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting gRPC server, listenning to {addr}");
     Server::builder()
+        .layer(middlewares::AuthenticationLayer(pool.clone()))
         .add_service(reflection)
         .add_service(codegen::authentication_server::AuthenticationServer::new(Authentication(pool.clone())))
         .serve(addr)

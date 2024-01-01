@@ -12,7 +12,7 @@ create table logs (
     user_id     UUID,
     at          timestamp with time zone default now(),
     -- constraints --
-    constraint fk_user   foreign key(user_id) references users(id)
+    constraint fk_user   foreign key(user_id) references users(id) on delete set null
 );
 
 create index logs_client_ip on logs (client_ip);

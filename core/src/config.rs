@@ -50,8 +50,11 @@ impl ConfigArgs {
 }
 
 impl Config {
+    pub fn init() -> Result<(), Error> {
+        Self::init_with_args(Default::default())
+    }
     /// Initialise configuration
-    pub fn init(args: ConfigArgs) -> Result<(), Error> {
+    pub fn init_with_args(args: ConfigArgs) -> Result<(), Error> {
         let _ = Self::init_logging();
 
         if let Some(mode) = &args.mode {

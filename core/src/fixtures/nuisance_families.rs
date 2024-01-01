@@ -1,9 +1,12 @@
-use fake::{faker::lorem::fr_fr::{Word, Paragraph}, Fake};
-use futures::future::BoxFuture;
+use async_stream::stream;
+use fake::{faker::lorem::en::{Word, Paragraph}, Fake};
+use futures::{future::BoxFuture, stream::BoxStream};
 use sqlx::Acquire;
 use uuid::Uuid;
 
 use crate::{model::report::{NuisanceFamily, InsertNuisanceFamily, NewNuisanceFamily}, Error, services::ServiceTx, repositories::nuisance_families::traits::NuisanceFamilyRepository};
+
+use super::Fixture;
 
 #[derive(Default, Clone)]
 pub struct NuisanceFamilyFixture {
@@ -48,7 +51,7 @@ impl Into<InsertNuisanceFamily> for NuisanceFamilyFixture {
     fn into(self) -> InsertNuisanceFamily {
         InsertNuisanceFamily {
             id: self.id,
-            label: self.label.unwrap_or_else(|| Word().fake()),
+            label: self.label.unwrap_or_else(|| Paragraph(2..4).fake()),
             description: self.description.unwrap_or_else(|| Paragraph(30..120).fake()),
         }
     }
@@ -63,4 +66,12 @@ impl super::Fixture for NuisanceFamilyFixture {
             tx.repos.insert_nuisance_family(querier, self.into()).await
         })
     }
+}
+
+pub fn new_multi<'a, 'b, 'q>(tx: &'a mut ServiceTx<'q>) -> BoxStream<'b, Result<NuisanceFamily, Error>> 
+where 'a: 'b
+{
+    Box::pin(stream! {loop {
+        yield NuisanceFamilyFixture::new().into_entity(tx).await
+    }})
 }

@@ -115,6 +115,7 @@ impl ReportNuisanceTypeDecoder {
 
 struct ReportDecoder;
 struct GeometryDecoder;
+
 impl GeometryDecoder {
     pub fn from_row<'r>(index: &str, row: &'r PgRow) -> Result<Geometry, Error> {
         let geojson: String = row.try_get(index)?;

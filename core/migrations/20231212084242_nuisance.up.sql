@@ -13,7 +13,7 @@ create table nuisance_types (
     label varchar(255) not null,
     description text,
     -- constraints --
-    constraint fk_family foreign key(family_id) references nuisance_families(id)
+    constraint fk_family foreign key(family_id) references nuisance_families(id) on delete cascade
 );
 
 create unique index nuisance_types_labels on nuisance_types (family_id, label);

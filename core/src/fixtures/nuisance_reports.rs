@@ -1,5 +1,6 @@
+use async_stream::stream;
 use chrono::{Utc, DateTime};
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, stream::BoxStream};
 use geojson::Geometry;
 use rand::Rng;
 use sqlx::Acquire;
@@ -117,4 +118,14 @@ impl super::Fixture for NuisanceReportFixture {
             tx.repos.insert_nuisance_report(querier, self.into()).await
         })
     }
+}
+
+pub fn new_multi_with<'a, 'b, 'q, F: Fn() -> NuisanceReportFixture + Send + 'b>(tx: &'a mut ServiceTx<'q>, f: F) -> BoxStream<'b, Result<NuisanceReport, Error>> 
+where 'a: 'b
+{
+    Box::pin(stream! {
+        loop {
+            yield f().into_entity(tx).await
+        }
+    })
 }

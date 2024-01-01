@@ -6,7 +6,7 @@ use signuis_core::Error;
 use sqlx::{Postgres, Pool};
 
 pub fn setup_config() -> Result<(), Error> {
-    Config::init(ConfigArgs::default().set_mode(Mode::Test))
+    Config::init_with_args(ConfigArgs::default().set_mode(Mode::Test))
 }
 
 pub async fn setup_database() -> Result<Pool<Postgres>, Error>{

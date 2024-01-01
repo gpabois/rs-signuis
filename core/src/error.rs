@@ -1,8 +1,7 @@
-use chrono::format;
 use log::SetLoggerError;
 use sqlx::migrate::MigrateError;
 
-use crate::{Issue, issues};
+use crate::Issue;
 
 #[derive(Debug)]
 pub enum Error {
