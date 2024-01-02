@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package signuis;
 
 service Authentication {
@@ -10,6 +11,114 @@ message Credential {
     string password = 2;
 }
 
+message AuthenticationResult {
+    bool ok = 1;
+    oneof args {
+        string data = 2;
+        Error error = 3;
+    }
+}
+
+service Reporting {
+    rpc create_nuisance_family(NewNuisanceFamily) returns (CreateNuisanceFamilyResult);
+    rpc create_nuisance_type(NewNuisanceType) returns (CreateNuisanceTypeResult);
+    rpc report_nuisance(NewNuisanceReport) returns (CreateNuisanceReportResult);
+}
+
+/////////////////////
+// Nuisance family //
+/////////////////////
+
+message NewNuisanceFamily {
+    string label = 1;
+    string description = 2;
+}
+
+message NuisanceFamily {
+    string id = 1;
+    string label = 2;
+    string description = 3; 
+}
+
+message CreateNuisanceFamilyResult {
+    bool ok = 1;
+    oneof args {
+        NuisanceFamily data = 2;
+        Error error = 3;
+    }
+}
+
+///////////////////
+// Nuisance type //
+///////////////////
+
+message NewNuisanceType {
+    string label = 1;
+    string description = 2;
+    string family_id = 3;
+}
+
+message NuisanceType {
+    string id = 1;
+    string label = 2;
+    string description = 3;
+    NuisanceFamily family = 4; 
+}
+
+message CreateNuisanceTypeResult {
+    bool ok = 1;
+    oneof args {
+        NuisanceType data = 2;
+        Error error = 3;
+    }
+}
+
+/////////////////////
+// Nuisance report //
+/////////////////////
+
+message NewNuisanceReport {
+    Geometry location = 1;
+    string type_id = 2;
+    int32 intensity = 3;
+}
+
+message NuisanceReport {
+    string id = 1;
+    Geometry location = 2;
+    NuisanceType type = 3; 
+    int32 intensity = 4;
+    optional NuisanceReportUser user = 5;
+}
+
+message NuisanceReportUser {
+    string id = 1;
+    string name = 2;
+    string email = 3;
+    string avatar = 4;
+}
+
+message CreateNuisanceReportResult {
+    bool ok = 1;
+    oneof args {
+        NuisanceReport data = 2;
+        Error error = 3;
+    }
+}
+
+//////////////
+// Geometry //
+//////////////
+
+message Geometry {
+    string type = 1;
+    repeated float coordinates = 2;
+}
+
+///////////
+// Issue //
+///////////
+
 message Issue {
     string code = 1;
     string message = 2;
@@ -20,6 +129,10 @@ message Issues {
     repeated Issue issues = 1;
 }
 
+///////////
+// Error //
+///////////
+
 message Error {
     string code = 1;
     oneof args {
@@ -28,10 +141,3 @@ message Error {
     }
 }
 
-message AuthenticationResult {
-    bool ok = 1;
-    oneof args {
-        string token = 2;
-        Error error = 3;
-    }
-}

@@ -65,6 +65,7 @@ impl Session {
         .from(table_iden.clone())
         .left_join(UserIden::Table, Expr::col((UserIden::Table, UserIden::ID)).equals((table_iden.clone(), SessionIden::UserID)))
         .expr_as(Expr::col((table_iden.clone(), SessionIden::ID)), Alias::new("session_id"))
+        .expr_as(Expr::col((table_iden.clone(), SessionIden::Token)), Alias::new("session_token"))
         .expr_as(Expr::col((table_iden.clone(), SessionIden::ClientIp)), Alias::new("client_ip"))
         .expr_as(Expr::col((table_iden.clone(), SessionIden::ClientUserAgent)), Alias::new("client_user_agent"))
         .expr_as(Expr::col((UserIden::Table, UserIden::ID)), Alias::new("user_id"))
@@ -157,7 +158,8 @@ impl<'r> FromRow<'r, PgRow> for Session
         Result::Ok(Session {
             id: row.try_get("session_id")?,
             client: SessionClient::from_row(row)?,
-            user: OptionalUserSession::from_row(row)?.into()
+            user: OptionalUserSession::from_row(row)?.into(),
+            token: row.try_get("session_token")?
         })
     }
 }

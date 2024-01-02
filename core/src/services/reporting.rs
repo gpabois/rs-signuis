@@ -18,7 +18,7 @@ pub mod traits {
 
     pub trait Reporting<'q> {
         /// Report a nuisance
-        fn report_nuisance<'a, 'b, NR: Into<NewNuisanceReport> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> where 'q: 'b, 'a: 'b;
+        fn report_nuisance<'a, 'b, NR: TryInto<NewNuisanceReport, Error = crate::Error> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> where 'q: 'b, 'a: 'b;
         /// Create a nuisance family
         fn create_nuisance_family<'a, 'b, NF: Into<NewNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b;
         /// Create a nuisance type
@@ -107,9 +107,9 @@ impl Into<InsertNuisanceType> for NewNuisanceType {
 }
 
 impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
-    fn report_nuisance<'a, 'b, NR: Into<NewNuisanceReport> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> where 'q: 'b, 'a: 'b{
+    fn report_nuisance<'a, 'b, NR: TryInto<NewNuisanceReport, Error = crate::Error> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> where 'q: 'b, 'a: 'b{
         Box::pin(async {
-            let mut new = args.into();
+            let mut new = args.try_into()?;
             // Inject user 
             new.user_id = actor.user.as_ref().map(|u| u.id);
             

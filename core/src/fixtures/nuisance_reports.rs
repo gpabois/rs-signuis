@@ -72,9 +72,10 @@ impl NuisanceReportFixture {
 
 
 
-impl Into<NewNuisanceReport> for NuisanceReportFixture {
-    fn into(self) -> NewNuisanceReport {
-        NewNuisanceReport {
+impl TryInto<NewNuisanceReport> for NuisanceReportFixture {
+    type Error = crate::Error;
+    fn try_into(self) -> Result<NewNuisanceReport, Self::Error> {
+        Ok(NewNuisanceReport {
             location: self.location.unwrap_or_else(super::geojson::random_point),
             intensity: rand::thread_rng().gen_range(1..5),
             user_id: self.user_id
@@ -85,13 +86,15 @@ impl Into<NewNuisanceReport> for NuisanceReportFixture {
                 .type_id
                 .unwrap()
                 .expect_id("cannot generate nuisance report insertion data with pending type fixture")
-        }
+        })
     }  
 }
 
-impl Into<InsertNuisanceReport> for NuisanceReportFixture {
-    fn into(self) -> InsertNuisanceReport {
-        InsertNuisanceReport {
+impl TryInto<InsertNuisanceReport> for NuisanceReportFixture {
+    type Error = crate::Error;
+
+    fn try_into(self) -> Result<InsertNuisanceReport, Self::Error> {
+        Ok(InsertNuisanceReport {
             id: self.id,
             location: self.location.unwrap_or_else(super::geojson::random_point),
             intensity: rand::thread_rng().gen_range(1..5),
@@ -104,7 +107,7 @@ impl Into<InsertNuisanceReport> for NuisanceReportFixture {
                 .unwrap()
                 .expect_id("cannot generate nuisance report insertion data with pending type fixture"),
             created_at: self.created_at
-        }
+        })
     }
 }
 
@@ -115,7 +118,7 @@ impl super::Fixture for NuisanceReportFixture {
         Box::pin(async move {
             self.create_deps(tx).await?;
             let querier: &mut sqlx::PgConnection = tx.querier.acquire().await?;
-            tx.repos.insert_nuisance_report(querier, self.into()).await
+            tx.repos.insert_nuisance_report(querier, self.try_into()?).await
         })
     }
 }

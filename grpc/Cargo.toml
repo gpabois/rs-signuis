@@ -26,3 +26,5 @@ signuis-core = {path = "../core"}
 tower = "0.4.13"
 hyper = "1.1.0"
 tonic-reflection = "0.10.2"
+uuid = "1.6.1"
+geojson = "0.24.1"

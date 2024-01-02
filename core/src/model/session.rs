@@ -93,7 +93,9 @@ pub struct Session {
     pub id:     Option<Uuid>,
     pub client: Client,
     pub user:   Option<SessionUser>,
+    pub token: String
 }
+
 
 impl Session {
     /// Create an anonymous session
@@ -101,7 +103,8 @@ impl Session {
         Self {
             id: None,
             user: None,
-            client
+            client,
+            token: "".into()
         }
     }
 
