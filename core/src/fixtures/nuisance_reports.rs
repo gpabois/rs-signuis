@@ -1,12 +1,10 @@
 use async_stream::stream;
-use chrono::{Utc, DateTime};
 use futures::{future::BoxFuture, stream::BoxStream};
-use geojson::Geometry;
 use rand::Rng;
 use sqlx::Acquire;
-use uuid::Uuid;
+use crate::types::{datetime::{DateTime, Utc}, uuid::Uuid, geojson::Geometry};
 
-use crate::{Error, model::report::{NewNuisanceReport, InsertNuisanceReport, NuisanceReport}, services::ServiceTx, repositories::nuisance_reports::traits::NuisanceReportRepository};
+use crate::{Error, entities::nuisance::{CreateNuisanceReport, InsertNuisanceReport, NuisanceReport}, services::ServiceTx, repositories::nuisance_reports::traits::NuisanceReportRepository};
 
 use super::{rel::ForeignKeyFixture, Fixture, users::UserFixture, nuisance_types::NuisanceTypeFixture};
 
@@ -72,10 +70,10 @@ impl NuisanceReportFixture {
 
 
 
-impl TryInto<NewNuisanceReport> for NuisanceReportFixture {
+impl TryInto<CreateNuisanceReport> for NuisanceReportFixture {
     type Error = crate::Error;
-    fn try_into(self) -> Result<NewNuisanceReport, Self::Error> {
-        Ok(NewNuisanceReport {
+    fn try_into(self) -> Result<CreateNuisanceReport, Self::Error> {
+        Ok(CreateNuisanceReport {
             location: self.location.unwrap_or_else(super::geojson::random_point),
             intensity: rand::thread_rng().gen_range(1..5),
             user_id: self.user_id

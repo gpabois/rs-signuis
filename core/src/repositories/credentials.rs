@@ -2,12 +2,12 @@ use async_stream::stream;
 use futures::{stream::BoxStream, StreamExt};
 use sqlx::{FromRow, postgres::PgRow, Row};
 
-use crate::{model::credentials::{HashedCredential, CredentialFilter}, drivers};
+use crate::{entities::credentials::{HashedCredential, CredentialFilter}, drivers};
 
 pub mod traits {
     use futures::{stream::BoxStream, TryStreamExt, future::BoxFuture};
 
-    use crate::{model::credentials::{HashedCredential, CredentialFilter}, Error, drivers};
+    use crate::{entities::credentials::{HashedCredential, CredentialFilter}, Error, drivers};
 
     pub trait CredentialRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -35,7 +35,7 @@ pub mod traits {
 impl<'r> FromRow<'r, PgRow> for HashedCredential {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self {
-            id: row.try_get("id")?,
+            id: row.try_get::<uuid::Uuid, _>("id")?.into(),
             pwd_hash: row.try_get("password")?
         })
     }
@@ -45,7 +45,7 @@ mod sql_query {
     use sea_query::{Query, PostgresQueryBuilder, Cond, Expr};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::{model::credentials::CredentialFilter, sql::UserIden};
+    use crate::{entities::credentials::CredentialFilter, sql::UserIden};
 
     pub fn find_credentials_by(filter: CredentialFilter) -> (String, SqlxValues) {
         Query::select()
@@ -65,7 +65,7 @@ mod sql_query {
 
 impl<'q> traits::CredentialRepository<'q> for &'q super::Repository {
     fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
-        -> BoxStream<'b, Result<crate::model::credentials::HashedCredential, crate::Error>> 
+        -> BoxStream<'b, Result<crate::entities::credentials::HashedCredential, crate::Error>> 
     where 'a: 'b, 'q: 'b, Q: 'b {
         Box::pin(stream! {
             let (sql, arguments) = sql_query::find_credentials_by(filter);

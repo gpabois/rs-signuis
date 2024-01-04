@@ -4,12 +4,12 @@ use sea_query::{Cond, Expr, Query, PostgresQueryBuilder, Alias, Func, InsertStat
 use sea_query_binder::SqlxBinder;
 use sqlx::{Row, FromRow, postgres::PgRow};
 
-use crate::{model::user::{InsertUser, User, UserFilter}, sql::{UserIden, ConditionalInsert}, Error};
+use crate::{entities::user::{InsertUser, User, UserFilter}, sql::{UserIden, ConditionalInsert}, Error};
 
 pub mod traits {
     use futures::{future::BoxFuture, stream::BoxStream};
 
-    use crate::{model::user::{InsertUser, User, UserFilter}, Error, drivers};
+    use crate::{entities::user::{InsertUser, User, UserFilter}, Error, drivers};
 
     pub trait UserRepository<'q>: Sized + std::marker::Send +'q {
         /// Insert a new user
@@ -116,7 +116,7 @@ impl User {
 impl<'r> FromRow<'r, PgRow> for User {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self {
-            id: row.try_get("id")?,
+            id: row.try_get::<uuid::Uuid, _>("id")?.into(),
             name: row.try_get("name")?,
             email: row.try_get("email")?,
             avatar: row.try_get("avatar")?

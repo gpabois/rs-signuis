@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use crate::{model::session::{InsertSession, Session, SessionClient}, services::ServiceTx, repositories::sessions::traits::SessionRepository, Error};
+use crate::{entities::session::{InsertSession, Session, SessionClient}, services::ServiceTx, repositories::sessions::traits::SessionRepository, Error};
 use sqlx::Acquire;
-use uuid::Uuid;
+use crate::types::uuid::Uuid;
 
 use super::{users::UserFixture, Fixture, rel::ForeignKeyFixture};
 

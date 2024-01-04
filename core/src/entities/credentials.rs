@@ -1,4 +1,4 @@
-use uuid::Uuid;
+use crate::types::uuid::Uuid;
 
 use crate::Error;
 

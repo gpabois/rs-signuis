@@ -59,20 +59,22 @@ impl Service<Pool<Postgres>> {
         })
     }
 
-    pub async fn with<D, E, F>(&self, f: F) -> Result<D, E>
+    pub fn with<D, E, F>(&self, f: F) -> BoxFuture<'_, Result<D, E>>
     where 
-        for<'a, 'f, 'g> F:  std::ops::FnOnce(&'a mut ServiceTx<'g>) -> BoxFuture<'a, Result<D, E>>, E: From<Error> {
-        let mut tx = self.begin().await?;
-        match f(&mut tx).await {
-            Ok(val) => {
-                tx.commit().await?;
-                Ok(val)
-            },
-            Err(err) => {
-                tx.rollback().await?;
-                Err(err)
+        for<'a, 'f, 'g> F:  std::ops::FnOnce(&'a mut ServiceTx<'g>) -> BoxFuture<'a, Result<D, E>> + Send + 'a, D: Send, E: From<Error> + Send {        
+        Box::pin(async {
+            let mut tx = self.begin().await?;
+            match f(&mut tx).await {
+                Ok(val) => {
+                    tx.commit().await?;
+                    Ok(val)
+                },
+                Err(err) => {
+                    tx.rollback().await?;
+                    Err(err)
+                }
             }
-        }
+        })
     }
 
 }

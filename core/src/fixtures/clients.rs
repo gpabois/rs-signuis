@@ -1,5 +1,5 @@
 use fake::{faker::internet::fr_fr::{IP, UserAgent}, Fake};
-use crate::model::client::Client;
+use crate::entities::client::Client;
 
 pub fn new_client() -> Client {
     let ip: String = IP().fake();

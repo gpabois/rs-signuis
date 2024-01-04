@@ -3,10 +3,9 @@ use std::ops::Add;
 use chrono::{Utc, Duration};
 use futures::future::BoxFuture;
 
-use crate::{Error, model::{session::Session, log::LogFilter}};
+use crate::{Error, entities::{session::Session, log::LogFilter}};
 
 use super::logger::traits::Logger;
-
 
 pub enum View {
     Administration
@@ -20,7 +19,7 @@ pub enum Action {
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::model::session::Session;
+    use crate::entities::session::Session;
     use crate::Error;
 
     pub trait Authorization<'q>: Sized{

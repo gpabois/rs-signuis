@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use crate::{model::log::{Log, InsertLog, LogClient}, services::ServiceTx, repositories::logs::traits::LogsRepository, Error};
+use crate::{entities::log::{Log, InsertLog, LogClient}, services::ServiceTx, repositories::logs::traits::LogsRepository, Error};
 use sqlx::Acquire;
-use uuid::Uuid;
+use crate::types::uuid::Uuid;
 use fake::{faker::lorem::fr_fr::Word, Fake};
 
 use super::{users::UserFixture, Fixture, rel::ForeignKeyFixture};

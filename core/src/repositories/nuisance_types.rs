@@ -2,12 +2,12 @@ use futures::future::BoxFuture;
 use sea_query::{InsertStatement, Query, ReturningClause, Returning, IntoIden, SelectStatement, Expr, Alias};
 use sqlx::{FromRow, Row, postgres::PgRow};
 
-use crate::{sql::{ConditionalInsert, NuisanceFamilyIden, NuisanceTypeIden}, model::report::{ NuisanceFamily, InsertNuisanceType, NuisanceType}, drivers};
+use crate::{sql::{ConditionalInsert, NuisanceFamilyIden, NuisanceTypeIden}, entities::nuisance::{ NuisanceFamily, InsertNuisanceType, NuisanceType}, drivers};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{drivers, model::report::{InsertNuisanceType, NuisanceType}, Error};
+    use crate::{drivers, entities::nuisance::{InsertNuisanceType, NuisanceType}, Error};
 
     pub trait NuisanceTypeRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -48,7 +48,7 @@ struct NuisanceFamilyDecoder;
 impl NuisanceFamilyDecoder {
     pub fn from_row(row: &PgRow) -> Result<NuisanceFamily, sqlx::Error> {
         Ok(NuisanceFamily{
-            id: row.try_get("nuisance_family_id")?,
+            id: row.try_get::<uuid::Uuid, _>("nuisance_family_id")?.into(),
             label: row.try_get("nuisance_family_label")?,
             description: row.try_get("nuisance_family_description")?,
         })
@@ -58,7 +58,7 @@ impl NuisanceFamilyDecoder {
 impl<'r> FromRow<'r, PgRow> for NuisanceType {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self { 
-            id: row.try_get("nuisance_type_id")?, 
+            id: row.try_get::<uuid::Uuid, _>("nuisance_type_id")?.into(), 
             label: row.try_get("nuisance_type_label")?, 
             description: row.try_get("nuisance_type_description")?,
             family: NuisanceFamilyDecoder::from_row(row)?
@@ -101,7 +101,7 @@ mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, PostgresQueryBuilder, InsertStatement};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::model::report::{InsertNuisanceType, NuisanceType};
+    use crate::entities::nuisance::{InsertNuisanceType, NuisanceType};
 
     pub fn insert_nuisance_type(args: InsertNuisanceType) -> (String, SqlxValues) {
         let insert_query: InsertStatement = args

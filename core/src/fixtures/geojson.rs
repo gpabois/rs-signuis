@@ -1,7 +1,7 @@
 use fake::{faker::address::fr_fr::{Longitude, Latitude}, Fake};
-use geojson::{Geometry, Value};
+use crate::types::geojson::Geometry;
 
 pub fn random_point() -> Geometry {
     let coords = vec![Longitude().fake(), Latitude().fake()];
-    Geometry::new(Value::Point(coords))
+    Geometry(geojson::Geometry::new(geojson::Value::Point(coords)))
 }

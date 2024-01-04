@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
+use crate::types::uuid::Uuid;
 use super::{session::Session, client::Client};
 
 pub type LogClient = Client;

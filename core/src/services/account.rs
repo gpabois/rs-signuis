@@ -1,7 +1,7 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::{model::user::{RegisterUser, User, UserFilter, InsertUser}, Error, Issue, Issues, repositories::users::traits::UserRepository, Validator};
+use crate::{entities::user::{RegisterUser, User, UserFilter, InsertUser}, Error, Issue, Issues, repositories::users::traits::UserRepository, Validator};
 use crate::services::authorization::traits::Authorization;
 
 use super::authorization::Action;
@@ -9,7 +9,7 @@ use super::authorization::Action;
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{model::{user::{User, RegisterUser}, session::Session}, Error};
+    use crate::{entities::{user::{User, RegisterUser}, session::Session}, Error};
 
     pub trait Account<'q> {
         /// Register a new user
@@ -50,7 +50,7 @@ impl Validator for &'_ RegisterUser {
 }
 
 impl<'q> traits::Account<'q> for &'q mut super::ServiceTx<'_> {
-    fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::model::session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
+    fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::entities::session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
         Box::pin(async {
             // Check if the actor can register a user.
             self.can(actor, Action::CanRegister).await?;            

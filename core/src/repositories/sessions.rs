@@ -3,14 +3,13 @@ use futures::{stream::BoxStream, future::BoxFuture, StreamExt};
 use sea_query::{Cond, InsertStatement, Query, ReturningClause, Returning, SelectStatement, IntoIden, Alias, Expr, IntoCondition, PostgresQueryBuilder};
 use sea_query_binder::SqlxBinder;
 use sqlx::{FromRow, postgres::PgRow, Row};
-use uuid::Uuid;
 
-use crate::{model::session::{Session, SessionFilter, InsertSession, SessionClient, SessionUser}, drivers, Error, sql::{ConditionalInsert, SessionIden, UserIden}};
+use crate::{entities::session::{Session, SessionFilter, InsertSession, SessionClient, SessionUser}, drivers, Error, sql::{ConditionalInsert, SessionIden, UserIden}};
 
 pub mod traits {
     use futures::{stream::BoxStream, future::BoxFuture};
 
-    use crate::{model::session::{SessionFilter, Session, InsertSession}, Error, drivers};
+    use crate::{entities::session::{SessionFilter, Session, InsertSession}, Error, drivers};
 
     pub trait SessionRepository<'q>{
         fn insert_session<Q: drivers::DatabaseQuerier<'q>>(self, querier: Q, insert: InsertSession) 
@@ -133,11 +132,11 @@ struct OptionalUserSession(Option<SessionUser>);
 impl<'r> FromRow<'r, PgRow> for OptionalUserSession
 {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-        let user_id = row.try_get::<Option<Uuid>, _>("user_id")?;
+        let user_id = row.try_get::<Option<uuid::Uuid>, _>("user_id")?;
         Ok(match user_id {
             None => OptionalUserSession(Option::None),
             Some(id) => OptionalUserSession(Some(SessionUser {
-                id,
+                id: id.into(),
                 name: row.get("user_name"),
                 email: row.get("user_email"),
                 avatar: row.get("user_avatar")
@@ -156,7 +155,7 @@ impl<'r> FromRow<'r, PgRow> for Session
 {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Result::Ok(Session {
-            id: row.try_get("session_id")?,
+            id: row.try_get::<Option<uuid::Uuid>, _>("session_id")?.map(Into::into),
             client: SessionClient::from_row(row)?,
             user: OptionalUserSession::from_row(row)?.into(),
             token: row.try_get("session_token")?
@@ -169,7 +168,7 @@ mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, PostgresQueryBuilder, InsertStatement};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::model::session::{InsertSession, Session};
+    use crate::entities::session::{InsertSession, Session};
 
     pub fn insert_session(args: InsertSession) -> (String, SqlxValues) {
         //let token = generate_token(16);

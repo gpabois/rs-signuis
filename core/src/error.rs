@@ -1,4 +1,7 @@
+use std::convert::Infallible;
+
 use log::SetLoggerError;
+use node_bindgen::core::{TryIntoJs, val::JsObject};
 use sqlx::migrate::MigrateError;
 
 use crate::Issue;
@@ -12,6 +15,24 @@ pub enum Error {
     LoggerError(SetLoggerError),
     InvalidCredential,
     Unauthorized
+}
+
+impl From<Infallible> for Error {
+    fn from(value: Infallible) -> Self {
+        Error::InvalidCredential
+    }
+}
+
+impl TryIntoJs for Error {
+    fn try_to_js(self, js_env: &node_bindgen::core::val::JsEnv) -> Result<node_bindgen::sys::napi_value, node_bindgen::core::NjError> {
+        let mut obj = JsObject::new(js_env.clone(), js_env.create_object()?);
+
+        obj.set_property("code", js_env.create_string_utf8(&self.code())?)?;
+        obj.set_property("message", js_env.create_string_utf8(&self.message())?)?;
+        obj.set_property("issues", self.issues_or_empty().try_to_js(js_env)?)?;
+        
+        obj.try_to_js(js_env)
+    }
 }
 
 impl Error {

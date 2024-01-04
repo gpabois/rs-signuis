@@ -2,9 +2,9 @@ use async_stream::stream;
 use fake::{faker::lorem::en::{Word, Paragraph}, Fake};
 use futures::{future::BoxFuture, stream::BoxStream};
 use sqlx::Acquire;
-use uuid::Uuid;
+use crate::types::uuid::Uuid;
 
-use crate::{model::report::{NuisanceFamily, InsertNuisanceFamily, NewNuisanceFamily}, Error, services::ServiceTx, repositories::nuisance_families::traits::NuisanceFamilyRepository};
+use crate::{entities::nuisance::{NuisanceFamily, InsertNuisanceFamily, CreateNuisanceFamily}, Error, services::ServiceTx, repositories::nuisance_families::traits::NuisanceFamilyRepository};
 
 use super::Fixture;
 
@@ -38,9 +38,9 @@ impl NuisanceFamilyFixture {
     }
 }
 
-impl Into<NewNuisanceFamily> for NuisanceFamilyFixture {
-    fn into(self) -> NewNuisanceFamily {
-        NewNuisanceFamily {
+impl Into<CreateNuisanceFamily> for NuisanceFamilyFixture {
+    fn into(self) -> CreateNuisanceFamily {
+        CreateNuisanceFamily {
             label: self.label.unwrap_or_else(|| Word().fake()),
             description: self.description.unwrap_or_else(|| Paragraph(30..120).fake()),
         }

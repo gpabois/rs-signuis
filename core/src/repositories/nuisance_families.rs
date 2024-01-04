@@ -1,14 +1,14 @@
 use sea_query::{InsertStatement, Query, ReturningClause, Returning, PostgresQueryBuilder};
 use sea_query_binder::SqlxBinder;
 use sqlx::{FromRow, Row, postgres::PgRow};
-use uuid::Uuid;
+use crate::types::uuid::Uuid;
 
-use crate::{sql::{ConditionalInsert, NuisanceFamilyIden}, model::{report::{InsertNuisanceFamily, NuisanceFamily}, Identifiable}};
+use crate::{sql::{ConditionalInsert, NuisanceFamilyIden}, entities::{nuisance::{InsertNuisanceFamily, NuisanceFamily}, Identifiable}};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{drivers, model::report::{NuisanceFamily, InsertNuisanceFamily}, Error};
+    use crate::{drivers, entities::nuisance::{NuisanceFamily, InsertNuisanceFamily}, Error};
 
     pub trait NuisanceFamilyRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -31,7 +31,7 @@ impl NuisanceFamily {
 impl<'r> FromRow<'r, PgRow> for NuisanceFamily {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self { 
-            id: row.try_get("id")?, 
+            id: row.try_get::<uuid::Uuid, _>("id")?.into(), 
             label: row.try_get("label")?, 
             description: row.try_get("description")?, 
         })
@@ -65,8 +65,8 @@ impl InsertNuisanceFamily {
 
 impl<'q> traits::NuisanceFamilyRepository<'q> for &'q super::Repository 
 {
-    fn insert_nuisance_family<'a, 'b, Q: crate::drivers::DatabaseQuerier<'b>>(self, querier: Q, args: crate::model::report::InsertNuisanceFamily) 
-        -> futures::prelude::future::BoxFuture<'b, Result<crate::model::report::NuisanceFamily, crate::Error>> 
+    fn insert_nuisance_family<'a, 'b, Q: crate::drivers::DatabaseQuerier<'b>>(self, querier: Q, args: crate::entities::nuisance::InsertNuisanceFamily) 
+        -> futures::prelude::future::BoxFuture<'b, Result<crate::entities::nuisance::NuisanceFamily, crate::Error>> 
     where 'a: 'b, 'q: 'b, Q: 'b {
         Box::pin(async {
             let (sql, arguments) = args

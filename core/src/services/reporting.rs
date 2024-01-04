@@ -1,8 +1,8 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::model::report::{NewNuisanceReport, NewNuisanceFamily, NewNuisanceType, NuisanceReport, InsertNuisanceReport, InsertNuisanceFamily, NuisanceFamily, NuisanceType, InsertNuisanceType};
-use crate::model::session::Session;
+use crate::entities::nuisance::{CreateNuisanceReport, CreateNuisanceFamily, CreateNuisanceType, NuisanceReport, InsertNuisanceReport, InsertNuisanceFamily, NuisanceFamily, NuisanceType, InsertNuisanceType};
+use crate::entities::session::Session;
 use crate::repositories::nuisance_families::traits::NuisanceFamilyRepository;
 use crate::repositories::nuisance_reports::traits::NuisanceReportRepository;
 use crate::repositories::nuisance_types::traits::NuisanceTypeRepository;
@@ -14,19 +14,20 @@ use super::logger::traits::Logger;
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{model::{report::{NewNuisanceReport, NuisanceReport, NewNuisanceFamily, NuisanceFamily, NewNuisanceType, NuisanceType}, session::Session}, Error};
+    use crate::{entities::{nuisance::{CreateNuisanceReport, NuisanceReport, CreateNuisanceFamily, NuisanceFamily, CreateNuisanceType, NuisanceType}, session::Session}, Error};
 
     pub trait Reporting<'q> {
         /// Report a nuisance
-        fn report_nuisance<'a, 'b, NR: TryInto<NewNuisanceReport, Error = crate::Error> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> where 'q: 'b, 'a: 'b;
+        fn report_nuisance<'a, 'b, NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> 
+        where 'q: 'b, 'a: 'b, NR::Error: Into<Error>;
         /// Create a nuisance family
-        fn create_nuisance_family<'a, 'b, NF: Into<NewNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b;
+        fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b;
         /// Create a nuisance type
-        fn create_nuisance_type<'a, 'b, NT: Into<NewNuisanceType> + std::marker::Send + 'b>(self, args: NT, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceType, Error>> where 'q: 'b;
+        fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(self, args: NT, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceType, Error>> where 'q: 'b;
     }
 }
 
-impl Validator for &NewNuisanceReport {
+impl Validator for &CreateNuisanceReport {
     fn validate(self, issues: &mut crate::Issues) {
 
         issues.geojson_is_point(
@@ -48,7 +49,7 @@ impl Validator for &NewNuisanceReport {
     }
 }
 
-impl Into<InsertNuisanceReport> for NewNuisanceReport {
+impl Into<InsertNuisanceReport> for CreateNuisanceReport {
     fn into(self) -> InsertNuisanceReport {
         InsertNuisanceReport {
             id: None,
@@ -61,7 +62,7 @@ impl Into<InsertNuisanceReport> for NewNuisanceReport {
     }
 }
 
-impl Validator for &NewNuisanceFamily {
+impl Validator for &CreateNuisanceFamily {
     fn validate(self, issues: &mut Issues) {
         issues.not_empty(
             &self.label, 
@@ -73,7 +74,7 @@ impl Validator for &NewNuisanceFamily {
     }
 }
 
-impl Into<InsertNuisanceFamily> for NewNuisanceFamily {
+impl Into<InsertNuisanceFamily> for CreateNuisanceFamily {
     fn into(self) -> InsertNuisanceFamily {
         InsertNuisanceFamily {
             id: None,
@@ -83,7 +84,7 @@ impl Into<InsertNuisanceFamily> for NewNuisanceFamily {
     }
 }
 
-impl Validator for &NewNuisanceType {
+impl Validator for &CreateNuisanceType {
     fn validate(self, issues: &mut Issues) {
         issues.not_empty(
             &self.label, 
@@ -95,7 +96,7 @@ impl Validator for &NewNuisanceType {
     }
 }
 
-impl Into<InsertNuisanceType> for NewNuisanceType {
+impl Into<InsertNuisanceType> for CreateNuisanceType {
     fn into(self) -> InsertNuisanceType {
         InsertNuisanceType {
             id: None,
@@ -107,9 +108,11 @@ impl Into<InsertNuisanceType> for NewNuisanceType {
 }
 
 impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
-    fn report_nuisance<'a, 'b, NR: TryInto<NewNuisanceReport, Error = crate::Error> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> where 'q: 'b, 'a: 'b{
+    fn report_nuisance<'a, 'b, NR>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> 
+    where 'q: 'b, 'a: 'b, NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b, NR::Error: Into<Error>
+    {
         Box::pin(async {
-            let mut new = args.try_into()?;
+            let mut new = args.try_into().map_err(NR::Error::into)?;
             // Inject user 
             new.user_id = actor.user.as_ref().map(|u| u.id);
             
@@ -130,7 +133,7 @@ impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 
-    fn create_nuisance_family<'a, 'b, NF: Into<NewNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, _actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b {
+    fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, _actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b {
         Box::pin(async {
             let new_nuisance_family = args.into();
             let mut issues = Issues::new();        
@@ -147,7 +150,7 @@ impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 
-    fn create_nuisance_type<'a, 'b, NT: Into<NewNuisanceType> + std::marker::Send + 'b>(self, args: NT, _actor: &'a Session) -> BoxFuture<'b, Result<NuisanceType, Error>> where 'q: 'b {
+    fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(self, args: NT, _actor: &'a Session) -> BoxFuture<'b, Result<NuisanceType, Error>> where 'q: 'b {
         Box::pin(async {
             let new = args.into();
             let mut issues = Issues::new();        

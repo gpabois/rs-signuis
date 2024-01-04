@@ -1,7 +1,7 @@
 use async_stream::stream;
 use fake::{faker::internet::en::{Username, FreeEmail}, Fake};
 use futures::{future::BoxFuture, stream::BoxStream};
-use crate::{Error, model::user::{InsertUser, User}, services::ServiceTx, repositories::users::traits::UserRepository};
+use crate::{Error, entities::user::{InsertUser, User}, services::ServiceTx, repositories::users::traits::UserRepository};
 use sqlx::Acquire;
 use uuid::Uuid;
 

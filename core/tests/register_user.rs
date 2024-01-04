@@ -1,5 +1,5 @@
 use signuis_core::fixtures::{self, Fixture};
-use signuis_core::model::user::RegisterUser;
+use signuis_core::entities::user::RegisterUser;
 use signuis_core::services::account::traits::Account;
 mod setup;
 

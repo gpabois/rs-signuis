@@ -1,5 +1,6 @@
 use argon2::Argon2;
-use uuid::Uuid;
+use node_bindgen::derive::node_bindgen;
+use crate::types::uuid::Uuid;
 
 use super::Identifiable;
 
@@ -23,7 +24,7 @@ impl Into<InsertUser> for RegisterUser {
 }
 
 pub struct InsertUser {
-    pub id:         Option<uuid::Uuid>,
+    pub id:         Option<Uuid>,
     pub name:       String,
     pub email:      String,
     pub password:   Option<String>,
@@ -77,6 +78,7 @@ impl InsertUser {
     }
 }
 
+#[node_bindgen]
 pub enum UserFilter {
     Or(Vec<UserFilter>),
     And(Vec<UserFilter>),

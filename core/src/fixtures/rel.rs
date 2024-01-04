@@ -1,5 +1,5 @@
 use futures::future::BoxFuture;
-use crate::{services::ServiceTx, model::Identifiable, Error};
+use crate::{services::ServiceTx, entities::Identifiable, Error};
 
 use super::Fixture;
 

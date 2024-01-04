@@ -1,13 +1,13 @@
 use futures::future::BoxFuture;
-use crate::{Error, model::log::NewLog};
+use crate::{Error, entities::log::NewLog};
 use sqlx::Acquire;
 
-use crate::{repositories::logs::traits::LogsRepository, model::log::Log};
+use crate::{repositories::logs::traits::LogsRepository, entities::log::Log};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{model::log::{NewLog, Log, LogFilter}, Error};
+    use crate::{entities::log::{NewLog, Log, LogFilter}, Error};
 
     pub trait Logger<'q> {
         /// Log an event
@@ -18,7 +18,7 @@ pub mod traits {
 }
 
 pub mod logs {
-    use crate::model::{session::Session, log::NewLog, report::NuisanceReport};
+    use crate::entities::{session::Session, log::NewLog, nuisance::NuisanceReport};
 
     pub struct NuisanceReportCreated<'a, 'b>(&'a NuisanceReport, &'b Session);
     impl<'a, 'b> NuisanceReportCreated<'a, 'b> {
@@ -61,7 +61,7 @@ impl<'q> traits::Logger<'q> for &'q mut super::ServiceTx<'_>
         })
     }
 
-    fn count_log_by<'b>(self, args: crate::model::log::LogFilter) -> BoxFuture<'b, Result<i64, Error>> where 'q: 'b {
+    fn count_log_by<'b>(self, args: crate::entities::log::LogFilter) -> BoxFuture<'b, Result<i64, Error>> where 'q: 'b {
         Box::pin(async {
             let querier = self.querier.acquire().await?;
             self.repos.count_log_by(querier, args).await

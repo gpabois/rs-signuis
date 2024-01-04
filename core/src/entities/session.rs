@@ -1,6 +1,8 @@
 use chrono::{Utc, DateTime};
-use uuid::Uuid;
+use node_bindgen::core::JSValue;
+use node_bindgen::derive::node_bindgen;
 
+use crate::types::uuid::Uuid;
 use crate::utils::generate_token;
 
 use super::client::Client;
@@ -14,7 +16,6 @@ pub enum SessionFilter {
 
 impl SessionFilter 
 {
-
     pub fn and<I: IntoIterator<Item=Self>>(values: I) -> Self {
         Self::And(values.into_iter().collect())
     }
@@ -89,6 +90,7 @@ impl InsertSession {
     }
 }
 
+#[node_bindgen]
 pub struct Session {
     pub id:     Option<Uuid>,
     pub client: Client,
@@ -96,6 +98,11 @@ pub struct Session {
     pub token: String
 }
 
+impl JSValue<'_> for Session {
+    fn convert_to_rust(env: &'_ node_bindgen::core::val::JsEnv, js_value: node_bindgen::sys::napi_value) -> Result<Self, node_bindgen::core::NjError> {
+        todo!()
+    }
+}
 
 impl Session {
     /// Create an anonymous session
@@ -113,6 +120,7 @@ impl Session {
     }
 }
 
+#[node_bindgen]
 #[derive(Clone)]
 pub struct SessionUser {
     pub id:     Uuid,
