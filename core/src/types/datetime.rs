@@ -1,8 +1,7 @@
 use std::ptr;
 
 use chrono::TimeZone;
-use tracing::{error, debug, trace};
-use node_bindgen::{core::{JSValue, napi_call_result, TryIntoJs, NjError}, sys::{napi_create_date, napi_get_date_value}};
+use node_bindgen::{core::{JSValue, napi_call_result, TryIntoJs, NjError}, sys::napi_get_date_value};
 use sqlx_postgres::{Postgres, PgValueRef};
 
 pub type Utc = chrono::Utc;
@@ -16,9 +15,9 @@ impl<Tz: TimeZone> From<chrono::DateTime<Tz>> for DateTime<Tz> {
     }
 }
 
-impl<Tz: TimeZone, DB: sqlx::Database> sqlx::Type<DB> for DateTime<Tz> where uuid::Uuid: sqlx::Type<DB> {
+impl<Tz: TimeZone, DB: sqlx::Database> sqlx::Type<DB> for DateTime<Tz> where chrono::DateTime::<Tz>: sqlx::Type<DB> {
     fn type_info() -> DB::TypeInfo {
-        DateTime::<Tz>::type_info()
+        chrono::DateTime::<Tz>::type_info()
     }
 }
 
