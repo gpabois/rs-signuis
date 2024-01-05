@@ -1,0 +1,8 @@
+[build]
+target = "index.html"
+filehash = true
+no_minification = false
+
+[clean]
+dist = "dist"
+cargo = false
