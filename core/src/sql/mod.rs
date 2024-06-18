@@ -1,5 +1,7 @@
 use sea_query::{Iden, DynIden, SimpleExpr, IntoIden};
 
+/// Génère une requête d'insertion dynamique dont la structure
+/// peut être altérée en fonction de conditions
 pub struct ConditionalInsert(Vec<(DynIden, SimpleExpr)>);
 
 impl ToOwned for ConditionalInsert {
@@ -19,11 +21,24 @@ impl ConditionalInsert {
         Self(Vec::new())
     }
 
+    /// Ajoute une colonne avec une valeur associée.
     pub fn add<I>(&mut self, col: I, value: SimpleExpr) -> &mut Self where I: IntoIden {
         self.0.push((col.into_iden(), value));
         self
     }
 
+    /// Si la condition est vraie, ajoute une colonne avec une valeur à insérer
+    /// 
+    /// # Exemple
+    /// L'exemple ajoute une colonne ID à la famille de nuisance, si l'objet définit un identifiant.
+    /// 
+    /// ```
+    /// fn foo(insert: &InsertNuisanceFamily) {
+    ///     ConditionalInsert::new()
+    ///     .r#if(insert.id.is_some(), NuisanceFamilyIden::ID, || insert.id.unwrap().into());
+    /// }
+
+    /// ```
     pub fn r#if<I, F>(&mut self, test: bool, col: I, value: F) -> &mut Self where I: IntoIden, F: FnOnce() -> SimpleExpr {
         if test {
             self.0.push((col.into_iden(), value()))
@@ -40,6 +55,21 @@ impl ConditionalInsert {
         self
     }
 
+    /// Consume l'objet et retourne le tuple (colonnes, valeurs)
+    /// qui peuvent être injectés dans un requête SQL.
+    /// 
+    /// # Exemple
+    /// ```
+    /// fn foo(insert: ConditionalInsert) -> InsertStatement {
+    ///     let (columns, values) = c.into_tuple();
+    ///     Query::insert()
+    ///         .into_table(NuisanceFamilyIden::Table)
+    ///         .columns(columns)
+    ///         .values(values)
+    ///         .unwrap()
+    ///         .to_owned()
+    /// }
+    /// ```
     pub fn into_tuple(self) -> (Vec<DynIden>, Vec<SimpleExpr>) {
         let mut t: (Vec<DynIden>, Vec<SimpleExpr>) = (vec![], vec![]);
 

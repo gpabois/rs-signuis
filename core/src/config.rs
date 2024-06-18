@@ -1,7 +1,14 @@
 use crate::Error;
 use log::{info, warn};
 use log4rs::append::console::ConsoleAppender;
-pub struct Config{}
+
+/// Système gérant la configuration du service.
+/// 
+/// ```
+/// let args = ConfigArgs::default();
+/// Config::init(&args);
+/// ```
+pub struct Config;
 
 pub enum Mode {
     Test,
@@ -53,7 +60,8 @@ impl Config {
     pub fn init() -> Result<(), Error> {
         Self::init_with_args(Default::default())
     }
-    /// Initialise configuration
+
+    /// Initialise la configuration du service en fonction d'arguments généralement passés depuis une commande.
     pub fn init_with_args(args: ConfigArgs) -> Result<(), Error> {
         let _ = Self::init_logging();
 
@@ -65,8 +73,8 @@ impl Config {
         // Get the current mode.
         let mode = Self::get_mode();
         
-        info!(target: "signuis::config", "Executing from {:?}.", std::env::current_dir().unwrap().as_os_str().to_os_string());
-        info!(target: "signuis::config", "Configuring for {} environment...", mode);
+        info!(target: "signuis::config", "Execute le service depuis {:?}.", std::env::current_dir().unwrap().as_os_str().to_os_string());
+        info!(target: "signuis::config", "Configure pour environnement de type {:?}...", mode);
 
         let env_file = match mode {
             Mode::Test => "test.env",
@@ -83,6 +91,7 @@ impl Config {
         Ok(())
     }
 
+    /// Initialise le service de journalisation
     fn init_logging() -> Result<(), Error> {
         let stdout = ConsoleAppender::builder().build();
     
@@ -98,18 +107,22 @@ impl Config {
     fn load_env_file(env_file: &str) -> bool {
         match std::fs::metadata(env_file) {
             Ok(_) => {
-                info!(target: "signuis::config", "Loading environment file \"{}\".", env_file);
+                info!(target: "signuis::config", "Charge les variables environnement depuis le fichier \"{}\".", env_file);
                 dotenv::from_filename(env_file).ok();
                 return true;
             },
 
             Err(_) => {
-                warn!(target: "signuis::config", "No environment file \"{}\" existing!", env_file);
+                warn!(target: "signuis::config", "Aucun fichier d'environnement n'existe à l'emplacement \"{}\".", env_file);
                 return false;
             }
         };     
     }
 
+    /// Retourne le mode sollicité (production, test ou debug)
+    /// 
+    /// La routine va vérifier si une variable d'environnement "MODE" a été définie.
+    /// La routine retourne le mode production par défaut.
     pub fn get_mode() -> Mode {
         if let Some(val) = std::env::var("MODE").ok() {
             return val.into()

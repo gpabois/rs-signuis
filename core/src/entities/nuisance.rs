@@ -3,14 +3,14 @@ use crate::types::{datetime::{DateTime, Utc}, uuid::Uuid, geojson::Geometry, nod
 
 use super::Identifiable;
 
-/// Entity to create a nuisance family
+/// Objet pour créer une famille de nuisance.
 #[node_bindgen]
 pub struct CreateNuisanceFamily {
     pub label: String,
     pub description: String
 }
 
-/// Entity to insert into the repository
+/// Objet pour insérer une famille de nuisance dans une base de donnée.
 #[node_bindgen]
 pub struct InsertNuisanceFamily {
     pub id: Option<Uuid>,
@@ -18,7 +18,7 @@ pub struct InsertNuisanceFamily {
     pub description: String
 }
 
-/// A family of nuisance
+/// Une famille de nuisance (odeur, visuel, etc.)
 #[node_bindgen]
 pub struct NuisanceFamily {
     pub id: Uuid,

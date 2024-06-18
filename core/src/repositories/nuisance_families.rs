@@ -1,9 +1,12 @@
 use sea_query::{InsertStatement, Query, ReturningClause, Returning, PostgresQueryBuilder};
 use sea_query_binder::SqlxBinder;
 use sqlx::{FromRow, Row, postgres::PgRow};
-use crate::types::uuid::Uuid;
 
-use crate::{sql::{ConditionalInsert, NuisanceFamilyIden}, entities::{nuisance::{InsertNuisanceFamily, NuisanceFamily}, Identifiable}};
+use crate::{
+    types::uuid::Uuid,
+    entities::{InsertNuisanceFamily, NuisanceFamily, Identifiable},
+    sql::{ConditionalInsert, NuisanceFamilyIden}
+};
 
 pub mod traits {
     use futures::future::BoxFuture;
@@ -28,8 +31,8 @@ impl NuisanceFamily {
     }
 }
 
-impl<'r> FromRow<'r, PgRow> for NuisanceFamily {
-    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+impl FromRow<'_, PgRow> for NuisanceFamily {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self { 
             id: row.try_get::<uuid::Uuid, _>("id")?.into(), 
             label: row.try_get("label")?, 

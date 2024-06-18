@@ -5,6 +5,7 @@ use crate::types::node::{JsObjectConverter, TryIntoNativeValue};
 
 #[node_bindgen]
 #[derive(Clone)]
+/// Représente un client accédant au service.
 pub struct Client {
     pub ip: String,
     pub user_agent: String

@@ -41,12 +41,14 @@ impl<'r> FromRow<'r, PgRow> for HashedCredential {
     }
 }
 
+/// Module permettant de générer des requêtes SQL
 mod sql_query {
     use sea_query::{Query, PostgresQueryBuilder, Cond, Expr};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
     use crate::{entities::credentials::CredentialFilter, sql::UserIden};
 
+    /// Génère une requête filtrée de récupération d'informations d'identification.
     pub fn find_credentials_by(filter: CredentialFilter) -> (String, SqlxValues) {
         Query::select()
         .from(UserIden::Table)
@@ -63,6 +65,7 @@ mod sql_query {
     }
 }
 
+/// On implémente les fonctions de répertoire pour les informations d'identification.
 impl<'q> traits::CredentialRepository<'q> for &'q super::Repository {
     fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
         -> BoxStream<'b, Result<crate::entities::credentials::HashedCredential, crate::Error>> 

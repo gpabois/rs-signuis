@@ -26,6 +26,8 @@ log = "0.4.20"
 log4rs = "1.2.0"
 password-hash = "0.5.0"
 rand = "0.8.5"
+diesel = { version = "2.2.0", features = ["postgres"] }
+postgis_diesel = "2.4.0"
 sea-query = { version = "0.30.5", features = ["with-chrono", "with-uuid"] }
 sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres", "with-chrono", "with-uuid"] }
 sea-query-postgres =  { version = "0.4.0", features = ["with-chrono", "with-uuid"]}

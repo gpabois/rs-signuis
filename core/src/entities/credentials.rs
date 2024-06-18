@@ -32,6 +32,7 @@ impl HashedCredential {
 }
 
 #[derive(Default)]
+/// Un filtre sur les informations d'identification.
 pub struct CredentialFilter {
     pub name_or_email_eq: Option<String>
 }
