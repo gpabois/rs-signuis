@@ -4,14 +4,14 @@ use futures::{future::BoxFuture, TryStreamExt};
 use sqlx::Acquire;
 use crate::types::uuid::Uuid;
 
-use crate::{Error, entities::{session::{Session, SessionFilter}, credentials::{CredentialFilter, Credential}, session::InsertSession}, repositories::{sessions::traits::SessionRepository, credentials::traits::CredentialRepository}, Issues, Issue};
+use crate::{Error, models::{session::{Session, SessionFilter}, credentials::{CredentialFilter, Credential}, session::InsertSession}, repositories::{sessions::traits::SessionRepository, credentials::traits::CredentialRepository}, Issues, Issue};
 
 use super::{logger::{traits::Logger, logs::AuthenticationFailed}, authorization::{Action, traits::Authorization}};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{Error, entities::{session::Session, credentials::Credential}};
+    use crate::{Error, models::{session::Session, credentials::Credential}};
 
     pub trait Authentication<'q> {
         /// Verify the token, returns a user session if the token is valid.

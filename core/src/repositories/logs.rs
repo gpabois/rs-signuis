@@ -3,12 +3,12 @@ use sea_query::{IntoIden, InsertStatement, Query, IntoCondition, Cond, Expr, Pos
 use sea_query_binder::SqlxBinder;
 use sqlx::{FromRow, postgres::PgRow, Row};
 
-use crate::{Error, sql::{ConditionalInsert, LogIden}, entities::log::{InsertLog, Log, LogFilter, LogClient}, drivers::DatabaseQuerier};
+use crate::{Error, sql::{ConditionalInsert, LogIden}, models::log::{InsertLog, Log, LogFilter, LogClient}, drivers::DatabaseQuerier};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{entities::log::{InsertLog, LogFilter, Log}, Error, drivers};
+    use crate::{models::log::{InsertLog, LogFilter, Log}, Error, drivers};
 
     pub trait LogsRepository<'q>: Sized + std::marker::Send +'q {
         /// Insert a new log

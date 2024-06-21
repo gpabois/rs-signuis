@@ -4,7 +4,7 @@ use sqlx::{postgres::PgRow, Row};
 
 use crate::{
     sql::{ConditionalInsert, ReportIden, UserIden, NuisanceTypeIden, NuisanceFamilyIden}, 
-    entities::nuisance::{InsertNuisanceReport, NuisanceReport, NuisanceReportType, NuisanceReportFamily, ReportUser}, 
+    models::nuisance::{InsertNuisanceReport, NuisanceReport, NuisanceReportType, NuisanceReportFamily, ReportUser}, 
     Error, 
     drivers
 };
@@ -12,7 +12,7 @@ use crate::{
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{drivers, entities::nuisance::{InsertNuisanceReport, NuisanceReport}, Error};
+    use crate::{drivers, models::nuisance::{InsertNuisanceReport, NuisanceReport}, Error};
 
     pub trait NuisanceReportRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -177,7 +177,7 @@ mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, PostgresQueryBuilder, InsertStatement};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::entities::nuisance::{InsertNuisanceReport, NuisanceReport};
+    use crate::models::nuisance::{InsertNuisanceReport, NuisanceReport};
 
     pub fn insert_report(args: InsertNuisanceReport) -> (String, SqlxValues) {
         let insert_query: InsertStatement = args

@@ -4,12 +4,12 @@ use sea_query::{Cond, Expr, Query, PostgresQueryBuilder, Alias, Func, InsertStat
 use sea_query_binder::SqlxBinder;
 use sqlx::{Row, FromRow, postgres::PgRow};
 
-use crate::{entities::user::{InsertUser, User, UserFilter}, sql::{UserIden, ConditionalInsert}, Error};
+use crate::{models::user::{InsertUser, User, UserFilter}, sql::{UserIden, ConditionalInsert}, Error};
 
 pub mod traits {
     use futures::{future::BoxFuture, stream::BoxStream};
 
-    use crate::{entities::user::{InsertUser, User, UserFilter}, Error, drivers};
+    use crate::{models::user::{InsertUser, User, UserFilter}, Error, drivers};
 
     pub trait UserRepository<'q>: Sized + std::marker::Send +'q {
         /// Insert a new user

@@ -2,12 +2,12 @@ use async_stream::stream;
 use futures::{stream::BoxStream, StreamExt};
 use sqlx::{FromRow, postgres::PgRow, Row};
 
-use crate::{entities::credentials::{HashedCredential, CredentialFilter}, drivers};
+use crate::{models::credentials::{HashedCredential, CredentialFilter}, drivers};
 
 pub mod traits {
     use futures::{stream::BoxStream, TryStreamExt, future::BoxFuture};
 
-    use crate::{entities::credentials::{HashedCredential, CredentialFilter}, Error, drivers};
+    use crate::{models::credentials::{HashedCredential, CredentialFilter}, Error, drivers};
 
     pub trait CredentialRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -46,7 +46,7 @@ mod sql_query {
     use sea_query::{Query, PostgresQueryBuilder, Cond, Expr};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::{entities::credentials::CredentialFilter, sql::UserIden};
+    use crate::{models::credentials::CredentialFilter, sql::UserIden};
 
     /// Génère une requête filtrée de récupération d'informations d'identification.
     pub fn find_credentials_by(filter: CredentialFilter) -> (String, SqlxValues) {
@@ -68,7 +68,7 @@ mod sql_query {
 /// On implémente les fonctions de répertoire pour les informations d'identification.
 impl<'q> traits::CredentialRepository<'q> for &'q super::Repository {
     fn find_credentials_by<'a, 'b, Q: drivers::DatabaseQuerier<'b>>(self, querier: Q, filter: CredentialFilter) 
-        -> BoxStream<'b, Result<crate::entities::credentials::HashedCredential, crate::Error>> 
+        -> BoxStream<'b, Result<crate::models::credentials::HashedCredential, crate::Error>> 
     where 'a: 'b, 'q: 'b, Q: 'b {
         Box::pin(stream! {
             let (sql, arguments) = sql_query::find_credentials_by(filter);

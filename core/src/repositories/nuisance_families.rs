@@ -4,14 +4,14 @@ use sqlx::{FromRow, Row, postgres::PgRow};
 
 use crate::{
     types::uuid::Uuid,
-    entities::{InsertNuisanceFamily, NuisanceFamily, Identifiable},
+    models::{InsertNuisanceFamily, NuisanceFamily, Identifiable},
     sql::{ConditionalInsert, NuisanceFamilyIden}
 };
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{drivers, entities::nuisance::{NuisanceFamily, InsertNuisanceFamily}, Error};
+    use crate::{drivers, models::nuisance::{NuisanceFamily, InsertNuisanceFamily}, Error};
 
     pub trait NuisanceFamilyRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -68,8 +68,8 @@ impl InsertNuisanceFamily {
 
 impl<'q> traits::NuisanceFamilyRepository<'q> for &'q super::Repository 
 {
-    fn insert_nuisance_family<'a, 'b, Q: crate::drivers::DatabaseQuerier<'b>>(self, querier: Q, args: crate::entities::nuisance::InsertNuisanceFamily) 
-        -> futures::prelude::future::BoxFuture<'b, Result<crate::entities::nuisance::NuisanceFamily, crate::Error>> 
+    fn insert_nuisance_family<'a, 'b, Q: crate::drivers::DatabaseQuerier<'b>>(self, querier: Q, args: crate::models::nuisance::InsertNuisanceFamily) 
+        -> futures::prelude::future::BoxFuture<'b, Result<crate::models::nuisance::NuisanceFamily, crate::Error>> 
     where 'a: 'b, 'q: 'b, Q: 'b {
         Box::pin(async {
             let (sql, arguments) = args

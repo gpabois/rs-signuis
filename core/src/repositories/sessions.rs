@@ -4,12 +4,12 @@ use sea_query::{Cond, InsertStatement, Query, ReturningClause, Returning, Select
 use sea_query_binder::SqlxBinder;
 use sqlx::{FromRow, postgres::PgRow, Row};
 
-use crate::{entities::session::{Session, SessionFilter, InsertSession, SessionClient, SessionUser}, drivers, Error, sql::{ConditionalInsert, SessionIden, UserIden}};
+use crate::{models::session::{Session, SessionFilter, InsertSession, SessionClient, SessionUser}, drivers, Error, sql::{ConditionalInsert, SessionIden, UserIden}};
 
 pub mod traits {
     use futures::{stream::BoxStream, future::BoxFuture};
 
-    use crate::{entities::session::{SessionFilter, Session, InsertSession}, Error, drivers};
+    use crate::{models::session::{SessionFilter, Session, InsertSession}, Error, drivers};
 
     pub trait SessionRepository<'q>{
         fn insert_session<Q: drivers::DatabaseQuerier<'q>>(self, querier: Q, insert: InsertSession) 
@@ -168,7 +168,7 @@ mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, PostgresQueryBuilder, InsertStatement};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::entities::session::{InsertSession, Session};
+    use crate::models::session::{InsertSession, Session};
 
     pub fn insert_session(args: InsertSession) -> (String, SqlxValues) {
         //let token = generate_token(16);

@@ -1,8 +1,8 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::entities::nuisance::{CreateNuisanceReport, CreateNuisanceFamily, CreateNuisanceType, NuisanceReport, InsertNuisanceReport, InsertNuisanceFamily, NuisanceFamily, NuisanceType, InsertNuisanceType};
-use crate::entities::session::Session;
+use crate::models::nuisance::{CreateNuisanceReport, CreateNuisanceFamily, CreateNuisanceType, NuisanceReport, InsertNuisanceReport, InsertNuisanceFamily, NuisanceFamily, NuisanceType, InsertNuisanceType};
+use crate::models::session::Session;
 use crate::repositories::nuisance_families::traits::NuisanceFamilyRepository;
 use crate::repositories::nuisance_reports::traits::NuisanceReportRepository;
 use crate::repositories::nuisance_types::traits::NuisanceTypeRepository;
@@ -14,7 +14,7 @@ use super::logger::traits::Logger;
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{entities::{nuisance::{CreateNuisanceReport, NuisanceReport, CreateNuisanceFamily, NuisanceFamily, CreateNuisanceType, NuisanceType}, session::Session}, Error};
+    use crate::{models::{nuisance::{CreateNuisanceReport, NuisanceReport, CreateNuisanceFamily, NuisanceFamily, CreateNuisanceType, NuisanceType}, session::Session}, Error};
 
     pub trait Reporting<'q> {
         /// Report a nuisance
