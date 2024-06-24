@@ -1,29 +1,34 @@
-use crate::types::uuid::Uuid;
+use uuid::Uuid;
 
 use crate::Error;
 
-pub struct Credential {
-    pub name_or_email: String,
-    pub password: String
+pub struct Credential<'a> {
+    pub name_or_email: &'a str,
+    pub password: &'a str,
 }
 
-impl Credential {
+impl Credential<'_> {
     pub fn new(name_or_email: &str, password: &str) -> Self {
-        Self{name_or_email: name_or_email.into(), password: password.into()}
+        Self {
+            name_or_email,
+            password,
+        }
     }
 }
 
 pub struct HashedCredential {
     pub id: Uuid,
-    pub pwd_hash: String   
+    pub pwd_hash: String,
 }
-
 
 impl HashedCredential {
     pub fn verify_credential(&self, credential: &Credential) -> Result<(), Error> {
-        let pwd_hash = password_hash::PasswordHash::new(&self.pwd_hash).expect("invalid password hash");
-        
-        if let Result::Err(_) = pwd_hash.verify_password(&[&argon2::Argon2::default()], credential.password.clone()) {
+        let pwd_hash =
+            password_hash::PasswordHash::new(&self.pwd_hash).expect("invalid password hash");
+
+        if let Result::Err(_) =
+            pwd_hash.verify_password(&[&argon2::Argon2::default()], credential.password.clone())
+        {
             return Error::invalid_credentials().into();
         }
 
@@ -34,7 +39,7 @@ impl HashedCredential {
 #[derive(Default)]
 /// Un filtre sur les informations d'identification.
 pub struct CredentialFilter {
-    pub name_or_email_eq: Option<String>
+    pub name_or_email_eq: Option<String>,
 }
 
 impl CredentialFilter {

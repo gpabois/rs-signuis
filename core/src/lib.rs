@@ -1,19 +1,18 @@
 mod error;
-mod utils;
 mod issues;
 mod schema;
+mod utils;
 
-pub mod types;
-
-pub mod repositories;
 pub mod models;
+pub mod repositories;
 
 pub mod config;
-pub use issues::*;
 pub use error::Error;
+pub use issues::*;
 
 pub mod services;
 
 pub use log;
 
-pub mod fixtures;
+
+

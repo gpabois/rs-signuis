@@ -1,125 +1,104 @@
-use node_bindgen::{derive::node_bindgen, core::{JSValue, val::{JsObject, JsEnv}}, sys::napi_value};
-use crate::types::{datetime::{DateTime, Utc}, uuid::Uuid, geojson::Geometry, node::{JsObjectConverter, TryIntoNativeValue}};
-
-use super::Identifiable;
+use chrono::{DateTime, Utc};
+use diesel::{deserialize::Queryable, prelude::Insertable, Selectable};
+use postgis_diesel::sql_types::Geometry;
+use uuid::Uuid;
 
 /// Objet pour créer une famille de nuisance.
-#[node_bindgen]
-pub struct CreateNuisanceFamily {
-    pub label: String,
-    pub description: String
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::nuisance_families)]
+pub struct NewNuisanceFamily<'a> {
+    pub label: &'a str,
+    pub description: &'a str,
 }
 
-/// Objet pour insérer une famille de nuisance dans une base de donnée.
-#[node_bindgen]
-pub struct InsertNuisanceFamily {
+impl From<NewNuisanceFamily<'_>> for InsertNuisanceFamily<'_> {
+    fn from(value: NewNuisanceFamily<'_>) -> Self {
+        Self {
+            id: None,
+            label: value.label,
+            description: value.description,
+        }
+    }
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::nuisance_families)]
+pub struct InsertNuisanceFamily<'a> {
     pub id: Option<Uuid>,
-    pub label: String,
-    pub description: String
+    pub label: &'a str,
+    pub description: &'a str,
 }
 
 /// Une famille de nuisance (odeur, visuel, etc.)
-#[node_bindgen]
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::nuisance_families)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NuisanceFamily {
     pub id: Uuid,
     pub label: String,
     pub description: String,
 }
 
-
-#[node_bindgen]
-pub struct CreateNuisanceType {
-    pub label: String,
-    pub description: String,
-    pub family_id: Uuid   
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::nuisance_types)]
+pub struct NewNuisanceType<'a> {
+    pub label: &'a str,
+    pub description: &'a str,
+    pub family_id: Uuid,
 }
 
-pub struct InsertNuisanceType {
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::nuisance_types)]
+pub struct InsertNuisanceType<'a> {
     pub id: Option<Uuid>,
-    pub label: String,
-    pub description: String,
-    pub family_id: Uuid  
+    pub label: &'a str,
+    pub description: &'a str,
+    pub family_id: Uuid,
 }
 
-#[node_bindgen]
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::nuisance_types)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NuisanceType {
     pub id: Uuid,
     pub label: String,
     pub description: String,
-    pub family: NuisanceFamily
+    pub family_id: Uuid,
 }
 
-impl Identifiable for NuisanceType {
-    type Type= Uuid;
-
-    fn id(&self) -> Self::Type {
-        self.id.clone()
-    }
-}
-
-
-#[node_bindgen]
 #[derive(Clone)]
-pub struct CreateNuisanceReport {
-    pub type_id:    Uuid,
-    pub user_id:    Option<Uuid>,
-    pub location:   Geometry,
-    pub intensity:  i8,
+pub struct NewNuisanceReport {
+    pub type_id: Uuid,
+    pub user_id: Option<Uuid>,
+    pub location: Geometry,
+    pub intensity: i8,
 }
 
-impl<'a> JSValue<'a> for CreateNuisanceReport {
-    fn convert_to_rust(env: &'a JsEnv, js_value: napi_value) -> Result<Self, node_bindgen::core::NjError> {
-        let obj = JsObjectConverter::from(JsObject::convert_to_rust(env, js_value)?);
-
-        let u32_intensity: u32 = obj.get_property("intensity")?.try_into_native_value()?;
-
-        Ok(Self {
-            type_id: obj.get_property("type_id")?.try_into_native_value()?,
-            user_id: obj.try_get_property("user_id")?.try_into_native_value()?,
-            location: obj.get_property("location")?.try_into_native_value()?,
-            intensity: u32_intensity as i8,
-        })
-    }
-}
-
-#[node_bindgen]
 pub struct NuisanceReportFamily {
     pub id: Uuid,
     pub label: String,
     pub description: String,
 }
 
-#[node_bindgen]
 pub struct NuisanceReportType {
     pub id: Uuid,
     pub label: String,
     pub description: String,
-    pub family: NuisanceReportFamily
+    pub family: NuisanceReportFamily,
 }
 
-#[node_bindgen]
 pub struct ReportUser {
     pub id: Uuid,
     pub name: String,
     pub email: String,
-    pub avatar: Option<String>
+    pub avatar: Option<String>,
 }
 
-#[node_bindgen]
 pub struct NuisanceReport {
     pub id: Uuid,
     pub r#type: NuisanceReportType,
     pub user: Option<ReportUser>,
     pub location: Geometry,
     pub intensity: i8,
-    pub created_at: DateTime<Utc>
-}
-
-pub struct InsertNuisanceReport {
-    pub id: Option<Uuid>,
-    pub type_id: Uuid,
-    pub user_id: Option<Uuid>,
-    pub location:   Geometry,
-    pub intensity:  i8,
-    pub created_at: Option<DateTime<Utc>>
+    pub created_at: DateTime<Utc>,
 }

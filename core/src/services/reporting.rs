@@ -1,12 +1,15 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::models::nuisance::{CreateNuisanceReport, CreateNuisanceFamily, CreateNuisanceType, NuisanceReport, InsertNuisanceReport, InsertNuisanceFamily, NuisanceFamily, NuisanceType, InsertNuisanceType};
+use crate::models::nuisance::{
+    CreateNuisanceFamily, CreateNuisanceReport, CreateNuisanceType, InsertNuisanceFamily,
+    InsertNuisanceReport, InsertNuisanceType, NuisanceFamily, NuisanceReport, NuisanceType,
+};
 use crate::models::session::Session;
 use crate::repositories::nuisance_families::traits::NuisanceFamilyRepository;
 use crate::repositories::nuisance_reports::traits::NuisanceReportRepository;
 use crate::repositories::nuisance_types::traits::NuisanceTypeRepository;
-use crate::{Error, Validator, Issue, Issues};
+use crate::{Error, Issue, Issues, Validator};
 
 use super::logger::logs::NuisanceReportCreated;
 use super::logger::traits::Logger;
@@ -14,37 +17,58 @@ use super::logger::traits::Logger;
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{models::{nuisance::{CreateNuisanceReport, NuisanceReport, CreateNuisanceFamily, NuisanceFamily, CreateNuisanceType, NuisanceType}, session::Session}, Error};
+    use crate::{
+        models::{
+            nuisance::{
+                CreateNuisanceFamily, CreateNuisanceReport, CreateNuisanceType, NuisanceFamily,
+                NuisanceReport, NuisanceType,
+            },
+            session::Session,
+        },
+        Error,
+    };
 
     pub trait Reporting<'q> {
         /// Report a nuisance
-        fn report_nuisance<'a, 'b, NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> 
-        where 'q: 'b, 'a: 'b, NR::Error: Into<Error>;
+        fn report_nuisance<'a, 'b, NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b>(
+            self,
+            args: NR,
+            actor: &'a Session,
+        ) -> BoxFuture<'b, Result<NuisanceReport, Error>>
+        where
+            'q: 'b,
+            'a: 'b,
+            NR::Error: Into<Error>;
         /// Create a nuisance family
-        fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b;
+        fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(
+            self,
+            args: NF,
+            actor: &'a Session,
+        ) -> BoxFuture<'b, Result<NuisanceFamily, Error>>
+        where
+            'q: 'b;
         /// Create a nuisance type
-        fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(self, args: NT, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceType, Error>> where 'q: 'b;
+        fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(
+            self,
+            args: NT,
+            actor: &'a Session,
+        ) -> BoxFuture<'b, Result<NuisanceType, Error>>
+        where
+            'q: 'b;
     }
 }
 
 impl Validator for &CreateNuisanceReport {
     fn validate(self, issues: &mut crate::Issues) {
-
         issues.geojson_is_point(
-            &self.location, 
-            Issue::new_invalid_form(
-            "La localisation doit être un point.", 
-            ["location"]
-            )
+            &self.location,
+            Issue::new_invalid_form("La localisation doit être un point.", ["location"]),
         );
 
         issues.within(
-            self.intensity, 
-            (1, 5), 
-            Issue::new_invalid_form(
-                "L'intensité doit être compris entre 1 et 5", 
-                ["intensity"]
-            )
+            self.intensity,
+            (1, 5),
+            Issue::new_invalid_form("L'intensité doit être compris entre 1 et 5", ["intensity"]),
         )
     }
 }
@@ -57,7 +81,7 @@ impl Into<InsertNuisanceReport> for CreateNuisanceReport {
             user_id: self.user_id,
             location: self.location,
             intensity: self.intensity,
-            created_at: None
+            created_at: None,
         }
     }
 }
@@ -65,11 +89,8 @@ impl Into<InsertNuisanceReport> for CreateNuisanceReport {
 impl Validator for &CreateNuisanceFamily {
     fn validate(self, issues: &mut Issues) {
         issues.not_empty(
-            &self.label, 
-            Issue::new_invalid_form(
-                "Le libellé ne doit pas être vide", 
-                ["label"]
-            )
+            &self.label,
+            Issue::new_invalid_form("Le libellé ne doit pas être vide", ["label"]),
         )
     }
 }
@@ -79,7 +100,7 @@ impl Into<InsertNuisanceFamily> for CreateNuisanceFamily {
         InsertNuisanceFamily {
             id: None,
             label: self.label,
-            description: self.description
+            description: self.description,
         }
     }
 }
@@ -87,11 +108,8 @@ impl Into<InsertNuisanceFamily> for CreateNuisanceFamily {
 impl Validator for &CreateNuisanceType {
     fn validate(self, issues: &mut Issues) {
         issues.not_empty(
-            &self.label, 
-            Issue::new_invalid_form(
-                "Le libellé ne doit pas être vide", 
-                ["label"]
-            )
+            &self.label,
+            Issue::new_invalid_form("Le libellé ne doit pas être vide", ["label"]),
         )
     }
 }
@@ -102,23 +120,31 @@ impl Into<InsertNuisanceType> for CreateNuisanceType {
             id: None,
             label: self.label,
             description: self.description,
-            family_id: self.family_id
+            family_id: self.family_id,
         }
     }
 }
 
 impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
-    fn report_nuisance<'a, 'b, NR>(self, args: NR, actor: &'a Session) -> BoxFuture<'b, Result<NuisanceReport, Error>> 
-    where 'q: 'b, 'a: 'b, NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b, NR::Error: Into<Error>
+    fn report_nuisance<'a, 'b, NR>(
+        self,
+        args: NR,
+        actor: &'a Session,
+    ) -> BoxFuture<'b, Result<NuisanceReport, Error>>
+    where
+        'q: 'b,
+        'a: 'b,
+        NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b,
+        NR::Error: Into<Error>,
     {
         Box::pin(async {
             let mut new = args.try_into().map_err(NR::Error::into)?;
-            // Inject user 
+            // Inject user
             new.user_id = actor.user.as_ref().map(|u| u.id);
-            
-            let mut issues = Issues::new();        
+
+            let mut issues = Issues::new();
             new.validate(&mut issues);
-    
+
             issues.assert_valid()?;
 
             let report = {
@@ -133,10 +159,17 @@ impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 
-    fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(self, args: NF, _actor: &'a Session) -> BoxFuture<'b, Result<NuisanceFamily, Error>> where 'q: 'b {
+    fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(
+        self,
+        args: NF,
+        _actor: &'a Session,
+    ) -> BoxFuture<'b, Result<NuisanceFamily, Error>>
+    where
+        'q: 'b,
+    {
         Box::pin(async {
             let new_nuisance_family = args.into();
-            let mut issues = Issues::new();        
+            let mut issues = Issues::new();
             new_nuisance_family.validate(&mut issues);
             issues.assert_valid()?;
 
@@ -150,10 +183,17 @@ impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 
-    fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(self, args: NT, _actor: &'a Session) -> BoxFuture<'b, Result<NuisanceType, Error>> where 'q: 'b {
+    fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(
+        self,
+        args: NT,
+        _actor: &'a Session,
+    ) -> BoxFuture<'b, Result<NuisanceType, Error>>
+    where
+        'q: 'b,
+    {
         Box::pin(async {
             let new = args.into();
-            let mut issues = Issues::new();        
+            let mut issues = Issues::new();
             new.validate(&mut issues);
             issues.assert_valid()?;
 
@@ -166,3 +206,4 @@ impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 }
+

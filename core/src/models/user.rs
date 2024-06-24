@@ -1,14 +1,14 @@
+use crate::types::uuid::Uuid;
 use argon2::Argon2;
 use node_bindgen::derive::node_bindgen;
-use crate::types::uuid::Uuid;
 
 use super::Identifiable;
 
 pub struct RegisterUser {
-    pub name:             String,
-    pub email:            String,
-    pub password:         String,
-    pub confirm_password: String
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub confirm_password: String,
 }
 
 impl Into<InsertUser> for RegisterUser {
@@ -18,17 +18,17 @@ impl Into<InsertUser> for RegisterUser {
             name: self.name,
             email: self.email,
             password: Some(self.password),
-            role: None
+            role: None,
         }
     }
 }
 
 pub struct InsertUser {
-    pub id:         Option<Uuid>,
-    pub name:       String,
-    pub email:      String,
-    pub password:   Option<String>,
-    pub role:       Option<String>,
+    pub id: Option<Uuid>,
+    pub name: String,
+    pub email: String,
+    pub password: Option<String>,
+    pub role: Option<String>,
 }
 
 impl InsertUser {
@@ -38,7 +38,7 @@ impl InsertUser {
             name: name.into(),
             email: email.into(),
             role: None,
-            password: None
+            password: None,
         }
     }
 
@@ -68,12 +68,12 @@ impl InsertUser {
                 let salt = password_hash::SaltString::generate(rand::thread_rng());
                 self.password = Some(
                     password_hash::PasswordHash::generate(Argon2::default(), pwd, &salt)
-                    .expect("cannot hash password")
-                    .to_string()
+                        .expect("cannot hash password")
+                        .to_string(),
                 );
                 self
             }
-            None => self
+            None => self,
         }
     }
 }
@@ -83,19 +83,15 @@ pub enum UserFilter {
     Or(Vec<UserFilter>),
     And(Vec<UserFilter>),
     Name(String),
-    Email(String)
+    Email(String),
 }
-
 
 /// A user filter
 impl UserFilter {
     pub fn name_or_email<V: Into<String>>(value: V) -> Self {
         let v = value.into();
 
-        Self::Or(vec![
-            UserFilter::Name(v.clone()),
-            UserFilter::Email(v)
-        ])
+        Self::Or(vec![UserFilter::Name(v.clone()), UserFilter::Email(v)])
     }
 
     pub fn or(conds: Vec<UserFilter>) -> Self {
@@ -112,14 +108,14 @@ impl UserFilter {
 }
 
 pub struct User {
-    pub id:     Uuid,
-    pub name:   String,
-    pub email:  String,
-    pub avatar: Option<String>
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub avatar: Option<String>,
 }
 
 impl Identifiable for User {
-    type Type= Uuid;
+    type Type = Uuid;
 
     fn id(&self) -> Self::Type {
         self.id.clone()

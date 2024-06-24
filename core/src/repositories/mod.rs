@@ -1,10 +1,13 @@
-pub mod sessions;
-pub mod credentials;
-pub mod users;
-pub mod logs;
-pub mod nuisance_reports;
-pub mod nuisance_families;
-pub mod nuisance_types;
+use sqlx::PgConnection;
 
-#[derive(Default, Clone, Copy)]
-pub struct Repository;
+pub mod credentials;
+pub mod nuisance_families;
+pub mod nuisance_reports;
+pub mod nuisance_types;
+pub mod sessions;
+pub mod users;
+
+#[derive(Default, Clone)]
+pub struct Repository {
+    conn: PgConnection,
+}

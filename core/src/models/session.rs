@@ -1,4 +1,4 @@
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use node_bindgen::core::JSValue;
 use node_bindgen::derive::node_bindgen;
 
@@ -14,13 +14,12 @@ pub enum SessionFilter {
     Or(Vec<SessionFilter>),
 }
 
-impl SessionFilter 
-{
-    pub fn and<I: IntoIterator<Item=Self>>(values: I) -> Self {
+impl SessionFilter {
+    pub fn and<I: IntoIterator<Item = Self>>(values: I) -> Self {
         Self::And(values.into_iter().collect())
     }
 
-    pub fn or<I: IntoIterator<Item=Self>>(values: I) -> Self {
+    pub fn or<I: IntoIterator<Item = Self>>(values: I) -> Self {
         Self::Or(values.into_iter().collect())
     }
 
@@ -33,45 +32,44 @@ impl SessionFilter
     }
 }
 
-
 pub type SessionClient = Client;
 
 pub struct InsertSession {
-    pub id:         Option<Uuid>,
-    pub token:      String,
-    pub client:     SessionClient,
-    pub user_id:    Option<Uuid>,
+    pub id: Option<Uuid>,
+    pub token: String,
+    pub client: SessionClient,
+    pub user_id: Option<Uuid>,
     pub expires_in: DateTime<Utc>,
-    pub created_at: Option<DateTime<Utc>>
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl InsertSession {
     pub fn new_with_token(token: String, client: Client) -> Self {
-        Self{
+        Self {
             id: None,
             token,
             client,
             user_id: None,
             expires_in: Utc::now(),
-            created_at: None  
+            created_at: None,
         }
     }
 
     pub fn new(client: Client) -> Self {
         let token = generate_token(16);
-        Self{
+        Self {
             id: None,
             token,
             client,
             user_id: None,
             expires_in: Utc::now(),
-            created_at: None  
+            created_at: None,
         }
     }
 
     pub fn set_id<I: Into<Uuid>>(mut self, value: I) -> Self {
         self.id = Some(value.into());
-        self       
+        self
     }
 
     pub fn set_user_id<I: Into<Uuid>>(mut self, user_id: I) -> Self {
@@ -92,14 +90,17 @@ impl InsertSession {
 
 #[node_bindgen]
 pub struct Session {
-    pub id:     Option<Uuid>,
+    pub id: Option<Uuid>,
     pub client: Client,
-    pub user:   Option<SessionUser>,
-    pub token: String
+    pub user: Option<SessionUser>,
+    pub token: String,
 }
 
 impl JSValue<'_> for Session {
-    fn convert_to_rust(env: &'_ node_bindgen::core::val::JsEnv, js_value: node_bindgen::sys::napi_value) -> Result<Self, node_bindgen::core::NjError> {
+    fn convert_to_rust(
+        env: &'_ node_bindgen::core::val::JsEnv,
+        js_value: node_bindgen::sys::napi_value,
+    ) -> Result<Self, node_bindgen::core::NjError> {
         todo!()
     }
 }
@@ -111,20 +112,20 @@ impl Session {
             id: None,
             user: None,
             client,
-            token: "".into()
+            token: "".into(),
         }
     }
 
     pub fn is_anonynmous(&self) -> bool {
-        return self.user.is_none()
+        return self.user.is_none();
     }
 }
 
 #[node_bindgen]
 #[derive(Clone)]
 pub struct SessionUser {
-    pub id:     Uuid,
-    pub name:   String,
-    pub email:  String,
-    pub avatar: Option<String>
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub avatar: Option<String>,
 }
