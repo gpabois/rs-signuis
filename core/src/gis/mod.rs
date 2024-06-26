@@ -1,6 +1,3 @@
-
-use std::convert::Infallible;
-
 pub mod entity;
 pub mod ewkb;
 
