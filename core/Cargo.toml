@@ -26,8 +26,6 @@ log = "0.4.20"
 log4rs = "1.2.0"
 password-hash = "0.5.0"
 rand = "0.8.5"
-diesel = { version = "2.2.0", features = ["postgres", "postgres_backend", "uuid"] }
-postgis_diesel = "2.4.0"
 sea-query = { version = "0.30.5", features = ["with-chrono", "with-uuid"] }
 sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres", "with-chrono", "with-uuid"] }
 sea-query-postgres =  { version = "0.4.0", features = ["with-chrono", "with-uuid"]}
@@ -42,3 +40,5 @@ node-bindgen = "6.0.1"
 serde = "1.0.194"
 sqlx-postgres = "0.7.3"
 tracing = "0.1.40"
+sea-orm = "0.12.15"
+byteorder = "1.5.0"

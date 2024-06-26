@@ -2,12 +2,12 @@ use futures::future::BoxFuture;
 use sea_query::{InsertStatement, Query, ReturningClause, Returning, IntoIden, SelectStatement, Expr, Alias};
 use sqlx::{FromRow, Row, postgres::PgRow};
 
-use crate::{sql::{ConditionalInsert, NuisanceFamilyIden, NuisanceTypeIden}, models::nuisance::{ NuisanceFamily, InsertNuisanceType, NuisanceType}, drivers};
+use crate::{sql::{ConditionalInsert, NuisanceFamilyIden, NuisanceTypeIden}, models::nuisance_family::{ NuisanceFamily, InsertNuisanceType, NuisanceType}, drivers};
 
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{drivers, models::nuisance::{InsertNuisanceType, NuisanceType}, Error};
+    use crate::{drivers, models::nuisance_family::{InsertNuisanceType, NuisanceType}, Error};
 
     pub trait NuisanceTypeRepository<'q>: Sized + std::marker::Send {
         // Find credentials based on a filter
@@ -101,7 +101,7 @@ mod sql_query {
     use sea_query::{Query, Alias, CommonTableExpression, PostgresQueryBuilder, InsertStatement};
     use sea_query_binder::{SqlxValues, SqlxBinder};
 
-    use crate::models::nuisance::{InsertNuisanceType, NuisanceType};
+    use crate::models::nuisance_family::{InsertNuisanceType, NuisanceType};
 
     pub fn insert_nuisance_type(args: InsertNuisanceType) -> (String, SqlxValues) {
         let insert_query: InsertStatement = args

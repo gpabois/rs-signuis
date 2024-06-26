@@ -3,6 +3,8 @@ mod issues;
 mod schema;
 mod utils;
 
+pub mod gis;
+
 pub mod models;
 pub mod repositories;
 

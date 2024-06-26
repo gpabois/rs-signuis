@@ -3,8 +3,8 @@ use std::ops::Add;
 use chrono::Duration;
 use chrono::Utc;
 use signuis_core::fixtures::logs::LogFixture;
-use signuis_core::models::credentials::Credential;
-use signuis_core::models::session::Session;
+use signuis_core::models::credential::Credential;
+use signuis_core::models::user_session::Session;
 use signuis_core::services::authentication::traits::Authentication;
 use signuis_core::Error;
 

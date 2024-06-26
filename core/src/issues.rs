@@ -1,8 +1,6 @@
 use email_address::EmailAddress;
 use futures::future::BoxFuture;
 use geojson::Value;
-use node_bindgen::core::TryIntoJs;
-use node_bindgen::core::val::JsObject;
 use crate::types::geojson::Geometry;
 
 use crate::Error;
@@ -25,18 +23,6 @@ impl Issue {
             code: "invalid_form".into(), 
             message: message.into()
         }
-    }
-}
-
-impl TryIntoJs for Issue {
-    fn try_to_js(self, js_env: &node_bindgen::core::val::JsEnv) -> Result<node_bindgen::sys::napi_value, node_bindgen::core::NjError> {
-        let mut obj = JsObject::new(js_env.clone(), js_env.create_object()?);
-
-        obj.set_property("code", js_env.create_string_utf8(&self.code)?)?;
-        obj.set_property("message", js_env.create_string_utf8(&self.message)?)?;
-        obj.set_property("path", self.path.try_to_js(js_env)?)?;
-
-        obj.try_to_js(js_env)
     }
 }
 

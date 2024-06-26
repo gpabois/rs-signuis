@@ -9,7 +9,7 @@ use super::authorization::Action;
 pub mod traits {
     use futures::future::BoxFuture;
 
-    use crate::{models::{user::{User, RegisterUser}, session::Session}, Error};
+    use crate::{models::{user::{User, RegisterUser}, user_session::Session}, Error};
 
     pub trait Account<'q> {
         /// Register a new user
@@ -50,7 +50,7 @@ impl Validator for &'_ RegisterUser {
 }
 
 impl<'q> traits::Account<'q> for &'q mut super::ServiceTx<'_> {
-    fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::models::session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
+    fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::models::user_session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
         Box::pin(async {
             // Check if the actor can register a user.
             self.can(actor, Action::CanRegister).await?;            

@@ -15,8 +15,8 @@ diesel::table! {
 diesel::table! {
     use diesel::sql_types::{Uuid, Varchar, Timestamptz};
 
-    /// Table des sessions
-    sessions(id) {
+    /// Table des sessions utilisateurs
+    user_sessions(id) {
         id -> Uuid,
         user_id -> Uuid,
         token -> Varchar,

@@ -4,7 +4,7 @@ use sqlx::{postgres::PgRow, FromRow, Row};
 
 use crate::{
     drivers,
-    models::credentials::{CredentialFilter, HashedCredential},
+    models::credential::{CredentialFilter, HashedCredential},
 };
 
 use super::Repository;
@@ -14,7 +14,7 @@ pub mod traits {
 
     use crate::{
         drivers,
-        models::credentials::{CredentialFilter, HashedCredential},
+        models::credential::{CredentialFilter, HashedCredential},
         Error,
     };
 
@@ -68,7 +68,7 @@ mod sql_query {
     use sea_query::{Cond, Expr, PostgresQueryBuilder, Query};
     use sea_query_binder::{SqlxBinder, SqlxValues};
 
-    use crate::{models::credentials::CredentialFilter, sql::UserIden};
+    use crate::{models::credential::CredentialFilter, sql::UserIden};
 
     /// Génère une requête filtrée de récupération d'informations d'identification.
     pub fn find_credentials_by(filter: CredentialFilter) -> (String, SqlxValues) {
@@ -101,7 +101,7 @@ impl<'q> traits::CredentialRepository<'q> for &'q super::Repository {
         self,
         querier: Q,
         filter: CredentialFilter,
-    ) -> BoxStream<'b, Result<crate::models::credentials::HashedCredential, crate::Error>>
+    ) -> BoxStream<'b, Result<crate::models::credential::HashedCredential, crate::Error>>
     where
         'a: 'b,
         'q: 'b,

@@ -16,15 +16,16 @@ impl Credential<'_> {
     }
 }
 
+/// Les identifiants stockés dans la base de données
 pub struct HashedCredential {
     pub id: Uuid,
-    pub pwd_hash: String,
+    pub password: String,
 }
 
 impl HashedCredential {
     pub fn verify_credential(&self, credential: &Credential) -> Result<(), Error> {
         let pwd_hash =
-            password_hash::PasswordHash::new(&self.pwd_hash).expect("invalid password hash");
+            password_hash::PasswordHash::new(&self.password).expect("invalid password hash");
 
         if let Result::Err(_) =
             pwd_hash.verify_password(&[&argon2::Argon2::default()], credential.password.clone())

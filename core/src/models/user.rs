@@ -1,32 +1,30 @@
 use crate::types::uuid::Uuid;
 use argon2::Argon2;
-use node_bindgen::derive::node_bindgen;
 
-use super::Identifiable;
-
-pub struct RegisterUser {
-    pub name: String,
-    pub email: String,
-    pub password: String,
-    pub confirm_password: String,
+/// Objet pour enregistrer un nouvel utilisateur.
+pub struct RegisterUser<'a> {
+    pub name: &'a str,
+    pub email: &'a str,
+    pub password: &'a str,
+    pub confirm_password: &'a str,
 }
 
-impl Into<InsertUser> for RegisterUser {
-    fn into(self) -> InsertUser {
-        InsertUser {
+impl From<RegisterUser> for InsertUser {
+    fn from(user: RegisterUser) -> Self {
+        Self {
             id: None,
-            name: self.name,
-            email: self.email,
-            password: Some(self.password),
+            name: user.name,
+            email: user.email,
+            password: Some(user.password.to_string()),
             role: None,
         }
     }
 }
 
-pub struct InsertUser {
+pub struct InsertUser<'a> {
     pub id: Option<Uuid>,
-    pub name: String,
-    pub email: String,
+    pub name: &'a str,
+    pub email: &'a str,
     pub password: Option<String>,
     pub role: Option<String>,
 }
@@ -78,7 +76,6 @@ impl InsertUser {
     }
 }
 
-#[node_bindgen]
 pub enum UserFilter {
     Or(Vec<UserFilter>),
     And(Vec<UserFilter>),

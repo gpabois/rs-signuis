@@ -1,12 +1,12 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::models::nuisance::{
+use crate::models::nuisance_family::{
     CreateNuisanceFamily, CreateNuisanceReport, CreateNuisanceType, InsertNuisanceFamily,
     InsertNuisanceReport, InsertNuisanceType, NuisanceFamily, NuisanceReport, NuisanceType,
 };
-use crate::models::session::Session;
-use crate::repositories::nuisance_families::traits::NuisanceFamilyRepository;
+use crate::models::user_session::Session;
+use crate::repositories::nuisance_family::traits::NuisanceFamilyRepository;
 use crate::repositories::nuisance_reports::traits::NuisanceReportRepository;
 use crate::repositories::nuisance_types::traits::NuisanceTypeRepository;
 use crate::{Error, Issue, Issues, Validator};
@@ -19,11 +19,11 @@ pub mod traits {
 
     use crate::{
         models::{
-            nuisance::{
+            nuisance_family::{
                 CreateNuisanceFamily, CreateNuisanceReport, CreateNuisanceType, NuisanceFamily,
                 NuisanceReport, NuisanceType,
             },
-            session::Session,
+            user_session::Session,
         },
         Error,
     };

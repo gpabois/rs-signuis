@@ -18,7 +18,7 @@ pub mod traits {
 }
 
 pub mod logs {
-    use crate::models::{session::Session, log::NewLog, nuisance::NuisanceReport};
+    use crate::models::{user_session::Session, log::NewLog, nuisance_family::NuisanceReport};
 
     pub struct NuisanceReportCreated<'a, 'b>(&'a NuisanceReport, &'b Session);
     impl<'a, 'b> NuisanceReportCreated<'a, 'b> {
