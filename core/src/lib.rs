@@ -3,7 +3,7 @@
 //mod schema;
 //mod utils;
 
-pub mod gis;
+pub mod sea_gis;
 
 //pub mod models;
 //pub mod repositories;
