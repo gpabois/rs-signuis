@@ -1,11 +1,15 @@
 use std::{ops::Add, borrow::BorrowMut};
+use actix::{Handler, ResponseActFuture, ResponseFuture, WrapFuture};
 use chrono::{Utc, Duration};
 use futures::{future::BoxFuture, TryStreamExt};
 use sqlx::Acquire;
+use crate::models::credential::CredentialSubmission;
+use crate::repositories::credential::FindOneCredentialByNameOrEmail;
 use crate::types::uuid::Uuid;
 
 use crate::{Error, models::{user_session::{Session, SessionFilter}, credential::{CredentialFilter, Credential}, user_session::InsertSession}, repositories::{sessions::traits::SessionRepository, credential::traits::CredentialRepository}, Issues, Issue};
 
+use super::Service;
 use super::{logger::{traits::Logger, logs::AuthenticationFailed}, authorization::{Action, traits::Authorization}};
 
 pub mod traits {
@@ -23,6 +27,21 @@ pub mod traits {
         fn authenticate_with_credentials<'a, 'b, 'c>(self, credential: &'c Credential, actor: &'a Session) 
             -> BoxFuture<'b, Result<Session, Error>> 
         where 'a: 'b, 'c: 'b, 'q: 'b;
+    }
+}
+
+pub struct Authenticate(CredentialSubmission);
+
+impl Handler<Authenticate> for Service {
+    type Result = ResponseFuture<Result<Session, Error>>;
+
+    fn handle(&mut self, msg: Authenticate, ctx: &mut Self::Context) -> Self::Result {
+        let repos = self.repos.clone();
+
+        Box::pin(async move {
+            let cred = repos.send(FindOneCredentialByNameOrEmail(msg.0.name_or_email.to_string())).await?;
+            
+        })
     }
 }
 

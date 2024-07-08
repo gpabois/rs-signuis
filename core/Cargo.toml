@@ -36,3 +36,4 @@ serde_json = "^1.0.108"
 serde = "1.0.194"
 tracing = "0.1.40"
 sql-gis = {git = "https://github.com/gpabois/sql-gis.git" }
+actix = "0.13.5"

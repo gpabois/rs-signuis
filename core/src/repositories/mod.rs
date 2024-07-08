@@ -1,4 +1,5 @@
-use sqlx::PgConnection;
+use actix::{Actor, Context};
+use sqlx::PgPool;
 
 pub mod credential;
 pub mod nuisance_family;
@@ -13,4 +14,10 @@ pub struct ChunkArgs {
 }
 
 #[derive(Default, Clone)]
-pub struct Repository {}
+pub struct Repository {
+    pool: PgPool
+}
+
+impl Actor for Repository {
+    type Context = Context<Self>;
+}

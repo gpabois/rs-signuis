@@ -1,19 +1,20 @@
 use argon2::PasswordHash;
+use fake::faker::name;
 use uuid::Uuid;
 
 use crate::error::Error;
 
 
-pub struct CredentialSubmission<'a> {
-    pub name_or_email: &'a str,
-    pub password: &'a str,
+pub struct CredentialSubmission {
+    pub name_or_email: String,
+    pub password: String,
 }
 
-impl CredentialSubmission<'_> {
+impl CredentialSubmission {
     pub fn new(name_or_email: &str, password: &str) -> Self {
         Self {
-            name_or_email,
-            password,
+            name_or_email: name_or_email.to_string(),
+            password: password.to_string(),
         }
     }
 }

@@ -1,20 +1,26 @@
+use actix::{Handler, ResponseFuture};
 use sqlx::Executor;
 
 use crate::models::credential::Credential;
 
 use super::Repository;
 
-/// On implémente les fonctions de répertoire pour les informations d'identification.
-impl Repository 
-{
-    async fn find_one_credential_by_name_or_email<'c, E: Executor<'c>>(&self, executor: E, name_or_email: &str) -> Result<Option<Credential>, crate::error::Error>
-    {
-        let cred: Credential = sqlx::query("SELECT id, password FROM users WHERE username=$1 OR WHERE email=$1")
-            .bind(name_or_email)
-            .fetch_optional(executor)
-            .await?;
+pub struct FindOneCredentialByNameOrEmail(pub String);
 
-        Ok(cred)
+impl Handler<FindOneCredentialByNameOrEmail> for Repository {
+    type Result = ResponseFuture<Result<Option<Credential>, crate::error::Error>>;
+
+    fn handle(&mut self, msg: FindOneCredentialByNameOrEmail, ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(async {
+            let conn: sqlx::pool::PoolConnection<sqlx::Postgres> = self.pool.acquire().await?;
+
+            let cred: Credential = sqlx::query("SELECT id, password FROM users WHERE username=$1 OR WHERE email=$1")
+                .bind(msg.0)
+                .fetch_optional(conn)
+                .await?;
+    
+            Ok(cred)
+        })
     }
 }
 
