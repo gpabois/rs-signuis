@@ -1,46 +1,68 @@
-use std::convert::Infallible;
-
 use log::SetLoggerError;
-use node_bindgen::core::{TryIntoJs, val::JsObject};
 use sqlx::migrate::MigrateError;
 
-use crate::Issue;
+use crate::issues::{self, Issues};
 
 #[derive(Debug)]
-pub enum Error {
+pub enum ErrorKind {
+    InternalError,
     MissingConfiguration(String),
     MigrationError(MigrateError),
-    DatabaseError(sqlx::Error),
-    ValidationError(Vec<Issue>),
+    DatabaseError,
+    Invalid(Issues),
     LoggerError(SetLoggerError),
     InvalidCredential,
     Unauthorized
 }
 
-impl From<Infallible> for Error {
-    fn from(_: Infallible) -> Self {
-        Error::InvalidCredential
+pub struct Error {
+    kind: ErrorKind,
+    source: Option<Box<dyn std::error::Error + 'static>>
+}
+
+impl From<sqlx::Error> for Error {
+    fn from(value: sqlx::Error) -> Self {
+        Self {
+            kind: ErrorKind::DatabaseError,
+            source: Some(Box::new(value))
+        }
     }
 }
 
-impl TryIntoJs for Error {
-    fn try_to_js(self, js_env: &node_bindgen::core::val::JsEnv) -> Result<node_bindgen::sys::napi_value, node_bindgen::core::NjError> {
-        let mut obj = JsObject::new(js_env.clone(), js_env.create_object()?);
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source()
+    }
 
-        obj.set_property("code", js_env.create_string_utf8(&self.code())?)?;
-        obj.set_property("message", js_env.create_string_utf8(&self.message())?)?;
-        obj.set_property("issues", self.issues_or_empty().try_to_js(js_env)?)?;
-
-        obj.try_to_js(js_env)
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        self.source()
     }
 }
 
 impl Error {
+    pub fn new_with_source(kind: ErrorKind, source: Option<Box<dyn std::error::Error + 'static>>) {
+        Self { kind, source }
+    }
+
+    pub fn internal_error<E: std::error::Error>(source: E) -> Self {
+        Self{kind: ErrorKind::InternalError, source: Box::new(source)}
+    }
+
+    pub fn invalid(issues: Issues) -> Self {
+        Self {kind: ErrorKind::InvalidError(), source: None}
+    }
+
+    pub fn invalid_credential() -> Self {
+        Self{kind: ErrorKind::InvalidCredential, source: None}
+    }
+}
+
+impl ErrorKind {
     pub fn code(&self) -> String {
         match self {
             Self::MissingConfiguration(_) => "missing_configuration".into(),
             Self::MigrationError(_) => "database_migration_error".into(),
-            Self::DatabaseError(_) => "database_error".into(),
+            Self::DatabaseError => "database_error".into(),
             Self::ValidationError(_) => "validation_error".into(),
             Self::LoggerError(_) => "logging_error".into(),
             Self::InvalidCredential => "invalid_credential".into(),
@@ -85,29 +107,5 @@ impl Error {
     }
     pub fn missing_env<S: Into<String>>(value: S) -> Self {
         return Self::MissingConfiguration(value.into());
-    }
-}
-
-impl<D> Into<Result<D, Error>> for Error {
-    fn into(self) -> Result<D, Error> {
-        Result::Err(self)
-    }
-}
-
-impl From<sqlx::migrate::MigrateError> for Error {
-    fn from(value: sqlx::migrate::MigrateError) -> Self {
-        Self::MigrationError(value)
-    } 
-}
-
-impl From<SetLoggerError> for Error {
-    fn from(value: SetLoggerError) -> Self {
-        Self::LoggerError(value)
-    }
-}
-
-impl From<sqlx::Error> for Error {
-    fn from(value: sqlx::Error) -> Self {
-        Self::DatabaseError(value)
     }
 }

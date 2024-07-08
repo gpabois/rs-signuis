@@ -3,7 +3,7 @@ create extension if not exists "uuid-ossp";
 
 create table users (
     id uuid primary key not null default uuid_generate_v4(),
-    name varchar(50) not null,
+    username varchar(50) not null,
     email varchar(50) not null,
     password varchar(255),
     avatar varchar(255),
@@ -20,11 +20,6 @@ create unique index users_unique_email on users (email);
 
 create table sessions (
     id          uuid primary key not null default uuid_generate_v4(),
-    ------------
-    -- client --
-    client_ip          varchar(39) not null,
-    client_user_agent  varchar(255) not null,
-    ------------
     user_id     uuid,
     token       varchar(255),
     created_at  timestamp with time zone default now(),

@@ -2,8 +2,8 @@ use sqlx::PgConnection;
 
 pub mod credential;
 pub mod nuisance_family;
-pub mod nuisance_reports;
-pub mod nuisance_types;
+pub mod nuisance_report;
+pub mod nuisance_type;
 pub mod sessions;
 pub mod users;
 
@@ -13,6 +13,4 @@ pub struct ChunkArgs {
 }
 
 #[derive(Default, Clone)]
-pub struct Repository {
-    conn: PgConnection,
-}
+pub struct Repository {}

@@ -1,19 +1,18 @@
-use crate::types::uuid::Uuid;
+use uuid::Uuid;
 use argon2::Argon2;
 
 /// Objet pour enregistrer un nouvel utilisateur.
-pub struct RegisterUser<'a> {
-    pub name: &'a str,
-    pub email: &'a str,
-    pub password: &'a str,
-    pub confirm_password: &'a str,
+pub struct RegisterUser {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub confirm_password: String,
 }
 
 impl From<RegisterUser> for InsertUser {
     fn from(user: RegisterUser) -> Self {
         Self {
-            id: None,
-            name: user.name,
+            username: user.username,
             email: user.email,
             password: Some(user.password.to_string()),
             role: None,
@@ -21,29 +20,23 @@ impl From<RegisterUser> for InsertUser {
     }
 }
 
-pub struct InsertUser<'a> {
-    pub id: Option<Uuid>,
-    pub name: &'a str,
-    pub email: &'a str,
+pub struct InsertUser {
+    pub username: String,
+    pub email: String,
     pub password: Option<String>,
     pub role: Option<String>,
 }
 
 impl InsertUser {
-    pub fn new(name: &str, email: &str) -> Self {
+    pub fn new(username: &str, email: &str) -> Self {
         Self {
-            id: None,
-            name: name.into(),
+            username: username.into(),
             email: email.into(),
             role: None,
             password: None,
         }
     }
 
-    pub fn set_id<I: Into<Uuid>>(mut self, id: I) -> Self {
-        self.id = Some(id.into());
-        self
-    }
     pub fn set_role(mut self, role: &str) -> Self {
         self.role = Some(role.into());
         self
@@ -109,12 +102,4 @@ pub struct User {
     pub name: String,
     pub email: String,
     pub avatar: Option<String>,
-}
-
-impl Identifiable for User {
-    type Type = Uuid;
-
-    fn id(&self) -> Self::Type {
-        self.id.clone()
-    }
 }

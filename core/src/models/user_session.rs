@@ -1,12 +1,6 @@
 use chrono::{DateTime, Utc};
-use node_bindgen::core::JSValue;
-use node_bindgen::derive::node_bindgen;
-
-use crate::types::uuid::Uuid;
-use crate::utils::generate_token;
-
-use super::client::Client;
-
+use uuid::Uuid;
+use crate::crypto::generate_token;
 
 /// Permet de filtrer une liste de session utilisateur
 pub enum SessionFilter {
@@ -34,8 +28,6 @@ impl SessionFilter {
         Self::ExpiresAtLte(value)
     }
 }
-
-pub type SessionClient = Client;
 
 /// Objet pour créer une nouvelle session utilisateur.
 pub struct NewUserSession {

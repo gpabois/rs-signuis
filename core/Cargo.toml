@@ -18,7 +18,7 @@ fake = { version = "2.9.1", features = ["derive"] }
 argon2 = "0.5.2"
 async-stream = "0.3.5"
 async-trait = "0.1.74"
-base64 = "0.21.5"
+base64 = "0.22.1"
 chrono = "0.4.31"
 dotenv = "0.15.0"
 futures = "0.3.29"
@@ -26,17 +26,13 @@ log = "0.4.20"
 log4rs = "1.2.0"
 password-hash = "0.5.0"
 rand = "0.8.5"
-sea-query = { version = "0.30.5", features = ["with-chrono", "with-uuid"] }
-sea-query-binder = { version = "0.5.0", features = ["sqlx", "sqlx-postgres", "with-chrono", "with-uuid"] }
-sea-query-postgres =  { version = "0.4.0", features = ["with-chrono", "with-uuid"]}
 sqlx = { version = "0.7.3", features = ["postgres", "runtime-tokio"] }
+sqlx-postgres = "0.7.3"
 time = "0.3.30"
 tokio = { version = "1.35.0", features = ["test-util", "rt", "macros"] }
 email_address = "0.2.4"
 future-result = "0.1.0"
-serde_json = "1.0.108"
+serde_json = "^1.0.108"
 serde = "1.0.194"
-sqlx-postgres = "0.7.3"
 tracing = "0.1.40"
-sea-orm = "0.12.15"
-byteorder = "1.5.0"
+sql-gis = {git = "https://github.com/gpabois/sql-gis.git" }

@@ -1,4 +1,3 @@
-pub mod client;
 pub mod credential;
 pub mod nuisance_family;
 pub mod nuisance_type;

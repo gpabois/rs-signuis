@@ -1,10 +1,10 @@
 use futures::future::BoxFuture;
 use sqlx::Acquire;
 
-use crate::{models::user::{RegisterUser, User, UserFilter, InsertUser}, Error, Issue, Issues, repositories::users::traits::UserRepository, Validator};
+use crate::{models::user::{InsertUser, RegisterUser, User, UserFilter}, repositories::users::traits::UserRepository, validation::{Validation, Validator}, Error, Issue, Issues, Validator};
 use crate::services::authorization::traits::Authorization;
 
-use super::authorization::Action;
+use super::{authorization::Action, Service};
 
 pub mod traits {
     use futures::future::BoxFuture;
@@ -17,69 +17,36 @@ pub mod traits {
     }
 }
 
-impl Validator for &'_ RegisterUser {
-    fn validate(self, issues: &mut Issues) {
-        issues.email(&self.email, 
-            Issue::new(
-                "invalid_form".into(), 
-                "Email invalide".into(), 
-                vec!["email".into()]
-            )
-        );
-
-        issues.eq(&self.password, &self.confirm_password, Issue::new(
-            "invalid_form".into(), 
-            "Les mots de passe ne sont pas égaux".into(), 
-            vec!["confirm_password".into()]
-        ));
-
-        issues.not_empty(&self.password, Issue::new(
-            "invalid_form".into(), 
-            "Le mot de passe ne doit pas être vide".into(), 
-            vec!["password".into()]
-        ));
-
-        issues.not_empty(&self.name, Issue::new(
-            "invalid_form".into(), 
-            "Le nom d'utilisateur ne doit pas être vide".into(), 
-            vec!["name".into()]
-        ));
-
+impl Validation for RegisterUser {   
+    fn assert(&self, validator: &mut Validator) {
+        validator.assert_valid_email(&self.email, Some("l'adresse courriel est invalide"), ["email"]);
+        validator.assert_eq(&self.password, &self.confirm_password, Some("les mots de passe ne sont pas égaux"), ["confirm_password"]);
+        validator.assert_not_empty(&self.password, Some("le mot de passe ne doit pas être vide"), ["password"]);
+        validator.assert_not_empty(&self.name, Some("le nom d'utilisateur ne doit pas être vide"), ["username"]);
 
     }
 }
 
-impl<'q> traits::Account<'q> for &'q mut super::ServiceTx<'_> {
-    fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a crate::models::user_session::Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q {
-        Box::pin(async {
-            // Check if the actor can register a user.
-            self.can(actor, Action::CanRegister).await?;            
+impl Service 
+{
+    /// Enregistre un nouvel utilisateur.
+    async fn register_user(&mut self, register: RegisterUser) -> Result<(), Error> {
+        let mut tx = self.pool.begin().await?;
+
+        let mut validator = Validator::default();
+        register.assert(&mut validator);
+        validator.check()?;
+
+        let (name_exists, email_exists) = self
+            .repos
+            .user_with_email_or_name_exists(&mut tx, &register.name, &register.email)
+            .await?;
         
-            // Validate the arguments
-            let mut issues = Issues::new();
-            args.validate(&mut issues);
-            issues.assert_valid()?; // Avoid a round to the database.
+        validator.assert_not_true(name_exists , Some("le nom d'utilisateur est déjà pris"), ["username"]);
+        validator.assert_not_true(email_exists , Some("l'adresse courriel est déjà pris"), ["email"]);
 
-            // Additional checks such as exiting name and email.
-            let querier = self.querier.acquire().await?;
-            issues.async_true(self.repos.any_users_by(&mut *querier, UserFilter::name(&args.name)), Issue::new(
-                "invalid_form".into(),
-                "Le nom d'utilisateur est déjà pris.".into(),
-                vec!["name".into()]
-            )).await?;
+        self.repos.insert_user(&mut tx, register).await?;
 
-            issues.async_true(self.repos.any_users_by(&mut *querier, UserFilter::email(&args.email)), Issue::new(
-                "invalid_form".into(),
-                "L'email est déjà pris.".into(),
-                vec!["email".into()]
-            )).await?;
-            issues.assert_valid()?;
-
-            // We can insert a new user into the database.
-            let insert: InsertUser = args.into();
-            self.repos
-            .insert_user(querier, insert)
-            .await
-        })
-    }
+        tx.commit();
+    }   
 }

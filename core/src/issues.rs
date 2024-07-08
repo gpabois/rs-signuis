@@ -1,9 +1,7 @@
+use std::ops::Deref;
+
 use email_address::EmailAddress;
 use futures::future::BoxFuture;
-use geojson::Value;
-use crate::types::geojson::Geometry;
-
-use crate::Error;
 
 #[derive(Debug, Clone)]
 pub struct Issue {
@@ -13,7 +11,7 @@ pub struct Issue {
 }
 
 impl Issue {
-    pub fn new(code: String, message: String, path: Vec<String>) -> Self {
+    pub fn new<S: ToString>(code: S, message: S, path: Vec<String>) -> Self {
         Self{code, path, message}
     }
 
@@ -30,8 +28,12 @@ pub struct Issues {
     issues: Vec<Issue>
 }
 
-pub trait Validator {
-    fn validate(self, issues: &mut Issues);
+impl Deref for Issues {
+    type Target = [Issue];
+
+    fn deref(&self) -> &Self::Target {
+        &self.issues
+    }
 }
 
 impl Issues {
@@ -152,15 +154,6 @@ impl Issues {
         if !EmailAddress::is_valid(value) {
             self.add(issue);
         }
-    }
-
-    pub fn geojson_is_point(&mut self, geom: &Geometry, issue: Issue) {
-        match geom.0.value {
-            Value::Point(_) => {},
-            _ => {
-                self.add(issue);
-            }
-        };
     }
 }
 

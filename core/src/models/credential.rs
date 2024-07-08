@@ -1,13 +1,15 @@
+use argon2::PasswordHash;
 use uuid::Uuid;
 
-use crate::Error;
+use crate::error::Error;
 
-pub struct Credential<'a> {
+
+pub struct CredentialSubmission<'a> {
     pub name_or_email: &'a str,
     pub password: &'a str,
 }
 
-impl Credential<'_> {
+impl CredentialSubmission<'_> {
     pub fn new(name_or_email: &str, password: &str) -> Self {
         Self {
             name_or_email,
@@ -16,40 +18,24 @@ impl Credential<'_> {
     }
 }
 
-/// Les identifiants stockés dans la base de données
-pub struct HashedCredential {
+#[derive(sqlx::FromRow)]
+/// Identifiants stockés en BDD.
+pub struct Credential {
+    /// Identifiant du compte associé.
     pub id: Uuid,
-    pub password: String,
+    /// Mot de passe hashé.
+    pub password: String
 }
 
-impl HashedCredential {
-    pub fn verify_credential(&self, credential: &Credential) -> Result<(), Error> {
+impl Credential {
+    
+    /// Vérifie les identifiants par rapport à une soumission.
+    pub fn verify_against(&self, submission: &CredentialSubmission) -> Result<(), Error> {
         let pwd_hash =
-            password_hash::PasswordHash::new(&self.password).expect("invalid password hash");
+            PasswordHash::new(&self.password).map_err(|source| Error::internal_error(source))?;
 
-        if let Result::Err(_) =
-            pwd_hash.verify_password(&[&argon2::Argon2::default()], credential.password.clone())
-        {
-            return Error::invalid_credentials().into();
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-/// Un filtre sur les informations d'identification.
-pub struct CredentialFilter {
-    pub name_or_email_eq: Option<String>,
-}
-
-impl CredentialFilter {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn name_or_email_equal_to(mut self, value: &str) -> Self {
-        self.name_or_email_eq = Some(value.into());
-        self
+        pwd_hash
+        .verify_password(&[&argon2::Argon2::default()], submission.password)
+        .map_err(|_ |Error::invalid_credential())
     }
 }
