@@ -1,17 +1,24 @@
-pub mod database;
 pub mod account;
 pub mod authentication;
 pub mod authorization;
+pub mod database;
 pub mod logger;
 pub mod reporting;
 
 use actix::{Actor, Addr, Context};
+use chrono::Duration;
 
-use crate::repositories::Repository;
+use crate::{events::EventBus, repositories::Repository};
+
+pub struct ServiceSettings {
+    user_session_expiration_time: Duration,
+}
 
 #[derive(Clone)]
 pub struct Service {
-    pub repos: Addr<Repository>
+    params: ServiceSettings,
+    repos: Addr<Repository>,
+    events: Addr<EventBus>,
 }
 
 impl Actor for Service {

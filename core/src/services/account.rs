@@ -1,52 +1,67 @@
-use futures::future::BoxFuture;
-use sqlx::Acquire;
+use actix::{Handler, Message, ResponseFuture};
 
-use crate::{models::user::{InsertUser, RegisterUser, User, UserFilter}, repositories::users::traits::UserRepository, validation::{Validation, Validator}, Error, Issue, Issues, Validator};
-use crate::services::authorization::traits::Authorization;
+use crate::{
+    error::Error,
+    events::UserRegistered,
+    forms::account::RegisterUserForm,
+    models::user::UserId,
+    repositories::user::{InsertUser, UserWithUsernameOrEmailExists},
+    validation::{Validation, Validator},
+};
 
-use super::{authorization::Action, Service};
+use super::Service;
 
-pub mod traits {
-    use futures::future::BoxFuture;
-
-    use crate::{models::{user::{User, RegisterUser}, user_session::Session}, Error};
-
-    pub trait Account<'q> {
-        /// Register a new user
-        fn register_user<'a, 'b>(self, args: RegisterUser, actor: &'a Session) -> BoxFuture<'b, Result<User, Error>> where 'q: 'b, 'a: 'q;
-    }
+pub struct RegisterUser {
+    form: RegisterUserForm,
 }
 
-impl Validation for RegisterUser {   
-    fn assert(&self, validator: &mut Validator) {
-        validator.assert_valid_email(&self.email, Some("l'adresse courriel est invalide"), ["email"]);
-        validator.assert_eq(&self.password, &self.confirm_password, Some("les mots de passe ne sont pas égaux"), ["confirm_password"]);
-        validator.assert_not_empty(&self.password, Some("le mot de passe ne doit pas être vide"), ["password"]);
-        validator.assert_not_empty(&self.name, Some("le nom d'utilisateur ne doit pas être vide"), ["username"]);
-
-    }
+impl Message for RegisterUser {
+    type Result = Result<UserId, Error>;
 }
 
-impl Service 
-{
-    /// Enregistre un nouvel utilisateur.
-    async fn register_user(&mut self, register: RegisterUser) -> Result<(), Error> {
-        let mut tx = self.pool.begin().await?;
+impl Handler<RegisterUser> for Service {
+    type Result = ResponseFuture<Result<UserId, Error>>;
 
-        let mut validator = Validator::default();
-        register.assert(&mut validator);
-        validator.check()?;
+    fn handle(&mut self, msg: RegisterUser, ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(async {
+            let mut validator = Validator::default();
+            msg.form.assert(&mut validator);
+            validator.check()?;
 
-        let (name_exists, email_exists) = self
-            .repos
-            .user_with_email_or_name_exists(&mut tx, &register.name, &register.email)
-            .await?;
-        
-        validator.assert_not_true(name_exists , Some("le nom d'utilisateur est déjà pris"), ["username"]);
-        validator.assert_not_true(email_exists , Some("l'adresse courriel est déjà pris"), ["email"]);
+            let exists = self
+                .repos
+                .send(UserWithUsernameOrEmailExists {
+                    username: msg.form.username.clone(),
+                    email: msg.form.email.clone(),
+                })
+                .await??;
 
-        self.repos.insert_user(&mut tx, register).await?;
+            validator.assert_not_true(
+                exists.username_exists,
+                Some("le nom d'utilisateur est déjà pris"),
+                ["username"],
+            );
 
-        tx.commit();
-    }   
+            validator.assert_not_true(
+                exists.email_exists,
+                Some("l'adresse courriel est déjà pris"),
+                ["email"],
+            );
+
+            let user_id = self
+                .repos
+                .send(InsertUser {
+                    username: msg.form.username,
+                    email: msg.form.email,
+                    password: Some(msg.form.password),
+                    role: "basic",
+                })
+                .await??;
+
+            // notifie les autres systèmes
+            self.events.send(UserRegistered(user_id));
+
+            Ok(user_id)
+        })
+    }
 }

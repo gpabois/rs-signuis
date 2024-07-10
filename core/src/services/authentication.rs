@@ -1,128 +1,74 @@
-use std::{ops::Add, borrow::BorrowMut};
-use actix::{Handler, ResponseActFuture, ResponseFuture, WrapFuture};
-use chrono::{Utc, Duration};
-use futures::{future::BoxFuture, TryStreamExt};
-use sqlx::Acquire;
-use crate::models::credential::CredentialSubmission;
-use crate::repositories::credential::FindOneCredentialByNameOrEmail;
-use crate::types::uuid::Uuid;
-
-use crate::{Error, models::{user_session::{Session, SessionFilter}, credential::{CredentialFilter, Credential}, user_session::InsertSession}, repositories::{sessions::traits::SessionRepository, credential::traits::CredentialRepository}, Issues, Issue};
+use actix::{Handler, Message, ResponseFuture};
+use chrono::{Duration, Utc};
 
 use super::Service;
-use super::{logger::{traits::Logger, logs::AuthenticationFailed}, authorization::{Action, traits::Authorization}};
+use crate::crypto::generate_token;
+use crate::error::Error;
+use crate::forms::authentication::CredentialForm;
+use crate::repositories::credential::MaybeFindOneCredentialByNameOrEmail;
+use crate::repositories::user_session::{
+    InsertUserSession, MaybeFindOneValidUserSessionByToken, UserSession,
+};
 
-pub mod traits {
-    use futures::future::BoxFuture;
-
-    use crate::{Error, models::{user_session::Session, credential::Credential}};
-
-    pub trait Authentication<'q> {
-        /// Verify the token, returns a user session if the token is valid.
-        fn check_session_token<'a, 'b>(self, token: &'a str) 
-            -> BoxFuture<'b, Result<Session, Error>> 
-        where 'a :'b, 'q: 'b;
-
-        /// Check credentials, and returns a user session if valid.
-        fn authenticate_with_credentials<'a, 'b, 'c>(self, credential: &'c Credential, actor: &'a Session) 
-            -> BoxFuture<'b, Result<Session, Error>> 
-        where 'a: 'b, 'c: 'b, 'q: 'b;
-    }
+/// Authentifie avec des identifiants simples.
+pub struct AuthenticateWithCredential {
+    pub form: CredentialForm,
 }
 
-pub struct Authenticate(CredentialSubmission);
+impl Message for AuthenticateWithCredential {
+    type Result = Result<String, Error>;
+}
 
-impl Handler<Authenticate> for Service {
-    type Result = ResponseFuture<Result<Session, Error>>;
+/// Vérifie le jeton de la session utilisateur.
+pub struct CheckUserSessionToken {
+    pub token: String,
+}
 
-    fn handle(&mut self, msg: Authenticate, ctx: &mut Self::Context) -> Self::Result {
+impl Message for CheckUserSessionToken {
+    type Result = Result<UserSession, Error>;
+}
+
+impl Handler<AuthenticateWithCredential> for Service {
+    type Result = ResponseFuture<Result<String, Error>>;
+
+    fn handle(&mut self, msg: AuthenticateWithCredential, ctx: &mut Self::Context) -> Self::Result {
         let repos = self.repos.clone();
 
         Box::pin(async move {
-            let cred = repos.send(FindOneCredentialByNameOrEmail(msg.0.name_or_email.to_string())).await?;
-            
+            let cred = repos
+                .send(MaybeFindOneCredentialByNameOrEmail(
+                    msg.form.name_or_email.to_string(),
+                ))
+                .await??;
+
+            cred.verify_credential(&msg.form.password)?;
+
+            let user_id = cred.id;
+            let token = generate_token(16);
+            let expires_at = Utc::now().add(Duration::hours(8));
+
+            self.repos
+                .send(InsertUserSession {
+                    user_id,
+                    token,
+                    expires_at,
+                })
+                .await?;
         })
     }
 }
 
-impl<'q> traits::Authentication<'q> for &'q mut super::ServiceTx<'_> {
-    fn check_session_token<'a, 'b>(self, token: &'a str) 
-        -> BoxFuture<'b, Result<Session, Error>> 
-    where 'a : 'b, 'q: 'b
-    {
+impl Handler<CheckUserSessionToken> for Service {
+    type Result = Result<UserSession, Error>;
+
+    fn handle(&mut self, msg: CheckUserSessionToken, ctx: &mut Self::Context) -> Self::Result {
+        let repos = self.repos.clone();
+
         Box::pin(async {
-            let querier = self.querier.acquire().await?;
-
-            let filter = SessionFilter::and(
-                vec![
-                    SessionFilter::TokenEq(token.into()),
-                    SessionFilter::ExpiresAtGte(Utc::now())
-                ]
-            );
-
             self.repos
-                .find_session_by(querier.borrow_mut(), filter)
-                .try_next()
-                .await?
-                .ok_or(Error::invalid_credentials())
-        })
-    }
-
-    fn authenticate_with_credentials<'a, 'b, 'c: 'b>(self, credential: &'c Credential, actor: &'a Session) 
-        -> BoxFuture<'b, Result<Session, Error>> 
-        where 'a : 'b, 'q: 'b {
-        
-        Box::pin(async {
-            let mut issues = Issues::new();
-
-            issues.async_assert_true(
-                self.can(actor, Action::CanAuthenticate), 
-                Issue::new_invalid_form( 
-                "Nombre maximal d'authentifications infructueuses atteint, veuillez attendre une quinzaine de minutes.",
-                ["*"]
-                )
-            ).await?;
-
-            let result: Result<Uuid, Error> = {
-                let querier = self.querier.acquire().await?;
-
-                let invalid_credential = Issue::new_invalid_form( 
-                    "Les données d'identification sont invalides",
-                    ["user_or_email"]
-                );
-    
-                let stored = issues.assert_some(
-                    self.repos.find_one_credential_by(&mut *querier,
-                    CredentialFilter::new()
-                            .name_or_email_equal_to(&credential.name_or_email)
-                    )
-                    .await?, 
-                    invalid_credential.clone()
-                )?;
-    
-                issues.assert_success(
-                    stored.verify_credential(credential), 
-                    invalid_credential.clone()
-                )?;
-
-                Ok(stored.id)
-            };
-
-            if result.is_err() {
-                self.log(AuthenticationFailed::new(actor)).await?;
-            }
-
-            let user_id = result?;
-
-            let querier = self.querier.acquire().await?;
-            let insert = InsertSession::new(actor.client.clone())
-                .set_user_id(user_id)
-                .set_expires_in(
-                    Utc::now()
-                    .add(Duration::hours(8))
-                );
-
-            self.repos.insert_session(querier, insert).await
+                .send(MaybeFindOneValidUserSessionByToken(msg.token))
+                .await??
+                .ok_or_else(|| Error::invalid_user_session())
         })
     }
 }

@@ -206,4 +206,3 @@ impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
         })
     }
 }
-
