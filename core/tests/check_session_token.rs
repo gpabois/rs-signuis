@@ -1,72 +1,89 @@
+use chrono::{Duration, Utc};
+use signuis_core::{
+    repositories::{user::fixtures::InsertUserFixture, user_session::InsertUserSession},
+    services::authentication::CheckUserSessionToken,
+};
+use std::error::Error;
 use std::ops::Add;
 
-use chrono::{Utc, Duration};
-use signuis_core::services::authentication::traits::Authentication;
-
 mod setup;
-use signuis_core::fixtures;
-use signuis_core::fixtures::Fixture;
 
 #[tokio::test]
-async fn check_session_token_with_valid_token() -> Result<(), signuis_core::Error> {
-    // Fixtures
-    let token = "token1234";
+async fn check_session_token_with_valid_token() -> Result<(), Box<dyn Error>> {
+    let sg = setup::setup().await?;
 
-    setup::with_service(|tx| {
-        Box::pin(async move{
-            let session = fixtures::sessions::SessionFixture::new()
-                                .with_token(token)
-                                .with_expires_at(Utc::now().add(Duration::hours(1)))
-                                .into_entity(tx)
-                                .await?;
-            
-            let stored = tx.check_session_token(token).await?;
-
-            assert_eq!(session.id, stored.id);
-
-            Ok(())
+    let user_id = sg.repos.execute(InsertUserFixture::new()).await?;
+    let session_id = sg
+        .repos
+        .execute(InsertUserSession {
+            user_id,
+            token: "token1234".to_owned(),
+            expires_at: Utc::now().add(Duration::hours(1)),
         })
-    }).await
+        .await?;
+
+    let maybe_session = sg
+        .auth
+        .execute(CheckUserSessionToken {
+            token: "token1234".to_owned(),
+        })
+        .await?;
+
+    assert!(maybe_session.is_some());
+
+    let session = maybe_session.unwrap();
+    assert_eq!(session.id, session_id);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn check_session_token_with_invalid_token() -> Result<(), signuis_core::Error> {
-    // Fixtures
-    let token = "token1234";
+async fn check_session_token_with_invalid_token() -> Result<(), Box<dyn Error>> {
+    let sg = setup::setup().await?;
 
-    setup::with_service(|tx| {
-        Box::pin(async move{
-            fixtures::sessions::SessionFixture::new()
-                .with_token(token)
-                .into_entity(tx)
-                .await?;
-            
-            let result = tx.check_session_token("fake_token").await;
-
-            assert_eq!(result.is_err(), true);
-    
-            Ok(())
+    let user_id = sg.repos.execute(InsertUserFixture::new()).await?;
+    sg.repos
+        .execute(InsertUserSession {
+            user_id,
+            token: "token1234".to_owned(),
+            expires_at: Utc::now().add(Duration::hours(1)),
         })
-    }).await
+        .await?;
+
+    let maybe_session = sg
+        .auth
+        .execute(CheckUserSessionToken {
+            token: "wrong_token".to_owned(),
+        })
+        .await?;
+
+    assert!(maybe_session.is_none());
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn check_session_token_with_expired_session() -> Result<(), signuis_core::Error> {
-    // Fixtures
-    let token = "token1234";
+async fn check_session_token_with_expired_session() -> Result<(), Box<dyn Error>> {
+    let sg = setup::setup().await?;
 
-    setup::with_service(|tx| {
-        Box::pin(async move{
-            // Generate an expired session
-            fixtures::sessions::SessionFixture::new()
-                .with_token(token)
-                .with_expires_at(Utc::now().add(Duration::hours(-10)))
-                .into_entity(tx)
-                .await?;
-            
-            let result = tx.check_session_token(token).await;
-            assert_eq!(result.is_err(), true);
-            Ok(())
+    let user_id = sg.repos.execute(InsertUserFixture::new()).await?;
+    sg.repos
+        .execute(InsertUserSession {
+            user_id,
+            token: "token1234".to_owned(),
+            expires_at: Utc::now().add(Duration::hours(-1)),
         })
-    }).await
+        .await?;
+
+    let maybe_session = sg
+        .auth
+        .execute(CheckUserSessionToken {
+            token: "token1234".to_owned(),
+        })
+        .await?;
+
+    assert!(maybe_session.is_none());
+
+    Ok(())
 }
+

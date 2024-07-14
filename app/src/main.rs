@@ -1,17 +1,33 @@
 #[cfg(feature = "ssr")]
+mod actions;
+#[cfg(feature = "ssr")]
+mod error;
+#[cfg(feature = "ssr")]
+mod middleware;
+
+mod api;
+mod app;
+mod pages;
+
+#[cfg(feature = "ssr")]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::*;
+    use app::App;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
-    use app::app::*;
+    use signuis_core::forms::authentication;
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
     println!("listening on http://{}", &addr);
+
+    let signuis = signuis_core::Signuis::new(signuis_core::SgSettings::default())
+        .await
+        .expect("cannot setup signuis");
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
@@ -24,9 +40,11 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/assets", site_root))
             // serve the favicon from /favicon.ico
             .service(favicon)
+            .service(actions::authenticate_with_credential)
             .leptos_routes(leptos_options.to_owned(), routes.to_owned(), App)
             .app_data(web::Data::new(leptos_options.to_owned()))
-        //.wrap(middleware::Compress::default())
+            .wrap(crate::middleware::SessionMiddleware::new(signuis.clone()))
+            .app_data(signuis.clone())
     })
     .bind(&addr)?
     .run()

@@ -1,208 +1,233 @@
-use futures::future::BoxFuture;
-use sqlx::Acquire;
+use actix::prelude::*;
+use futures::future::LocalBoxFuture;
+use sql_gis::types::Point;
 
-use crate::models::nuisance_family::{
-    CreateNuisanceFamily, CreateNuisanceReport, CreateNuisanceType, InsertNuisanceFamily,
-    InsertNuisanceReport, InsertNuisanceType, NuisanceFamily, NuisanceReport, NuisanceType,
+use crate::error::Error;
+use crate::events::EventBus;
+use crate::forms::reporting::{
+    CreateNuisanceFamilyForm, CreateNuisanceReportForm, CreateNuisanceTypeForm,
 };
-use crate::models::user_session::Session;
-use crate::repositories::nuisance_family::traits::NuisanceFamilyRepository;
-use crate::repositories::nuisance_reports::traits::NuisanceReportRepository;
-use crate::repositories::nuisance_types::traits::NuisanceTypeRepository;
-use crate::{Error, Issue, Issues, Validator};
+use crate::models::nuisance_family::{NuisanceFamily, NuisanceFamilyId};
+use crate::models::nuisance_report::NuisanceReportId;
+use crate::models::nuisance_type::NuisanceTypeId;
 
-use super::logger::logs::NuisanceReportCreated;
-use super::logger::traits::Logger;
+use crate::models::session::Session;
+use crate::repositories::nuisance_family::{
+    FetchNuisanceFamilies, InsertNuisanceFamily, NuisanceFamilyExists,
+};
+use crate::repositories::nuisance_report::InsertNuisanceReport;
+use crate::repositories::nuisance_type::{InsertNuisanceType, NuisanceTypeExists};
+use crate::repositories::Repository;
+use crate::validation::{Validation, Validator};
 
-pub mod traits {
-    use futures::future::BoxFuture;
+#[derive(Clone)]
+pub struct Reporting(Addr<ReportingActor>);
 
-    use crate::{
-        models::{
-            nuisance_family::{
-                CreateNuisanceFamily, CreateNuisanceReport, CreateNuisanceType, NuisanceFamily,
-                NuisanceReport, NuisanceType,
-            },
-            user_session::Session,
-        },
-        Error,
-    };
+impl Reporting {
+    pub fn new(repos: Repository, events: EventBus) -> Self {
+        Self(ReportingActor::new(repos, events).start())
+    }
 
-    pub trait Reporting<'q> {
-        /// Report a nuisance
-        fn report_nuisance<'a, 'b, NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b>(
-            self,
-            args: NR,
-            actor: &'a Session,
-        ) -> BoxFuture<'b, Result<NuisanceReport, Error>>
-        where
-            'q: 'b,
-            'a: 'b,
-            NR::Error: Into<Error>;
-        /// Create a nuisance family
-        fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(
-            self,
-            args: NF,
-            actor: &'a Session,
-        ) -> BoxFuture<'b, Result<NuisanceFamily, Error>>
-        where
-            'q: 'b;
-        /// Create a nuisance type
-        fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(
-            self,
-            args: NT,
-            actor: &'a Session,
-        ) -> BoxFuture<'b, Result<NuisanceType, Error>>
-        where
-            'q: 'b;
+    pub async fn execute<O: ReportingOp>(&self, op: O) -> Result<O::Return, Error> {
+        self.0.send(ExecuteReportingOp(op)).await?
     }
 }
 
-impl Validator for &CreateNuisanceReport {
-    fn validate(self, issues: &mut crate::Issues) {
-        issues.geojson_is_point(
-            &self.location,
-            Issue::new_invalid_form("La localisation doit être un point.", ["location"]),
-        );
+pub struct ReportingActor {
+    repos: Repository,
+    events: EventBus,
+}
 
-        issues.within(
-            self.intensity,
-            (1, 5),
-            Issue::new_invalid_form("L'intensité doit être compris entre 1 et 5", ["intensity"]),
-        )
+impl ReportingActor {
+    pub fn new(repos: Repository, events: EventBus) -> Self {
+        Self { repos, events }
     }
 }
 
-impl Into<InsertNuisanceReport> for CreateNuisanceReport {
-    fn into(self) -> InsertNuisanceReport {
-        InsertNuisanceReport {
-            id: None,
-            type_id: self.type_id,
-            user_id: self.user_id,
-            location: self.location,
-            intensity: self.intensity,
-            created_at: None,
-        }
+impl Actor for ReportingActor {
+    type Context = Context<Self>;
+}
+
+impl<O> Handler<ExecuteReportingOp<O>> for ReportingActor
+where
+    O: ReportingOp,
+{
+    type Result = ResponseFuture<Result<O::Return, Error>>;
+
+    fn handle(&mut self, msg: ExecuteReportingOp<O>, _ctx: &mut Self::Context) -> Self::Result {
+        let fut = msg.0.execute(self);
+
+        Box::pin(fut)
     }
 }
 
-impl Validator for &CreateNuisanceFamily {
-    fn validate(self, issues: &mut Issues) {
-        issues.not_empty(
-            &self.label,
-            Issue::new_invalid_form("Le libellé ne doit pas être vide", ["label"]),
-        )
-    }
-}
+pub trait ReportingOp: Sync + Send + 'static {
+    type Return: Sync + Send;
 
-impl Into<InsertNuisanceFamily> for CreateNuisanceFamily {
-    fn into(self) -> InsertNuisanceFamily {
-        InsertNuisanceFamily {
-            id: None,
-            label: self.label,
-            description: self.description,
-        }
-    }
-}
-
-impl Validator for &CreateNuisanceType {
-    fn validate(self, issues: &mut Issues) {
-        issues.not_empty(
-            &self.label,
-            Issue::new_invalid_form("Le libellé ne doit pas être vide", ["label"]),
-        )
-    }
-}
-
-impl Into<InsertNuisanceType> for CreateNuisanceType {
-    fn into(self) -> InsertNuisanceType {
-        InsertNuisanceType {
-            id: None,
-            label: self.label,
-            description: self.description,
-            family_id: self.family_id,
-        }
-    }
-}
-
-impl<'q> traits::Reporting<'q> for &'q mut super::ServiceTx<'_> {
-    fn report_nuisance<'a, 'b, NR>(
+    fn execute<'fut>(
         self,
-        args: NR,
-        actor: &'a Session,
-    ) -> BoxFuture<'b, Result<NuisanceReport, Error>>
-    where
-        'q: 'b,
-        'a: 'b,
-        NR: TryInto<CreateNuisanceReport> + std::marker::Send + 'b,
-        NR::Error: Into<Error>,
-    {
-        Box::pin(async {
-            let mut new = args.try_into().map_err(NR::Error::into)?;
-            // Inject user
-            new.user_id = actor.user.as_ref().map(|u| u.id);
+        reporting: &mut ReportingActor,
+    ) -> LocalBoxFuture<'fut, Result<Self::Return, Error>>;
+}
 
-            let mut issues = Issues::new();
-            new.validate(&mut issues);
+pub struct ExecuteReportingOp<O>(O)
+where
+    O: ReportingOp;
 
-            issues.assert_valid()?;
+impl<O> Message for ExecuteReportingOp<O>
+where
+    O: ReportingOp,
+{
+    type Result = Result<O::Return, Error>;
+}
 
-            let report = {
-                let querier = self.querier.acquire().await?;
-                let insert: InsertNuisanceReport = new.into();
-                self.repos.insert_nuisance_report(querier, insert).await?
-            };
+pub struct CreateNuisanceReport {
+    pub form: CreateNuisanceReportForm,
+    pub session: Session,
+}
 
-            self.log(NuisanceReportCreated::new(&report, actor)).await?;
+impl ReportingOp for CreateNuisanceReport {
+    type Return = NuisanceReportId;
 
-            Ok(report)
+    fn execute<'fut>(
+        self,
+        reporting: &mut ReportingActor,
+    ) -> LocalBoxFuture<'fut, Result<Self::Return, Error>> {
+        let repos = reporting.repos.clone();
+
+        Box::pin(async move {
+            let mut validator = Validator::default();
+            self.form.assert(&mut validator);
+            validator.check()?;
+
+            let user_id = self.session.user().map(|u| u.id);
+            let type_id = self.form.type_id.unwrap();
+
+            let exists = repos.execute(NuisanceTypeExists(type_id)).await?;
+
+            validator.assert_true(
+                exists,
+                Some("le type de nuisance n'existe pas"),
+                ["family_id"],
+            );
+            validator.check()?;
+
+            let intensity: i8 = self
+                .form
+                .intensity
+                .unwrap()
+                .try_into()
+                .map_err(Error::internal_error_with_source)?;
+
+            let location = Point::from(self.form.location.unwrap());
+
+            let report_id = repos
+                .execute(InsertNuisanceReport {
+                    user_id,
+                    type_id,
+                    intensity,
+                    location: location.into(),
+                })
+                .await?;
+
+            Ok(report_id)
         })
     }
+}
 
-    fn create_nuisance_family<'a, 'b, NF: Into<CreateNuisanceFamily> + std::marker::Send + 'b>(
+pub struct CreateNuisanceType {
+    pub form: CreateNuisanceTypeForm,
+    pub session: Session,
+}
+
+impl ReportingOp for CreateNuisanceType {
+    type Return = NuisanceTypeId;
+
+    fn execute<'fut>(
         self,
-        args: NF,
-        _actor: &'a Session,
-    ) -> BoxFuture<'b, Result<NuisanceFamily, Error>>
-    where
-        'q: 'b,
-    {
-        Box::pin(async {
-            let new_nuisance_family = args.into();
-            let mut issues = Issues::new();
-            new_nuisance_family.validate(&mut issues);
-            issues.assert_valid()?;
+        reporting: &mut ReportingActor,
+    ) -> LocalBoxFuture<'fut, Result<Self::Return, Error>> {
+        let repos = reporting.repos.clone();
 
-            let nuisance_family = {
-                let querier = self.querier.acquire().await?;
-                let insert: InsertNuisanceFamily = new_nuisance_family.into();
-                self.repos.insert_nuisance_family(querier, insert).await?
-            };
+        Box::pin(async move {
+            let mut validator = Validator::default();
+            self.form.assert(&mut validator);
+            validator.check()?;
 
-            Ok(nuisance_family)
+            let exists = repos
+                .execute(NuisanceFamilyExists(self.form.family_id))
+                .await?;
+
+            validator.assert_true(
+                exists,
+                Some("la famille de nuisance n'existe pas"),
+                ["family_id"],
+            );
+
+            validator.check()?;
+
+            let nuisance_type_id = repos
+                .execute(InsertNuisanceType {
+                    label: self.form.label,
+                    description: self.form.description,
+                    family_id: self.form.family_id,
+                })
+                .await?;
+
+            Ok(nuisance_type_id)
         })
     }
+}
+#[derive(Message)]
+#[rtype(result = "Result<Vec<NuisanceFamily>, Error>")]
+pub struct ListNuisanceFamilies {}
 
-    fn create_nuisance_type<'a, 'b, NT: Into<CreateNuisanceType> + std::marker::Send + 'b>(
+impl ListNuisanceFamilies {
+    pub fn all() -> Self {
+        Self {}
+    }
+}
+
+impl ReportingOp for ListNuisanceFamilies {
+    type Return = Vec<NuisanceFamily>;
+
+    fn execute<'fut>(
         self,
-        args: NT,
-        _actor: &'a Session,
-    ) -> BoxFuture<'b, Result<NuisanceType, Error>>
-    where
-        'q: 'b,
-    {
-        Box::pin(async {
-            let new = args.into();
-            let mut issues = Issues::new();
-            new.validate(&mut issues);
-            issues.assert_valid()?;
+        reporting: &mut ReportingActor,
+    ) -> LocalBoxFuture<'fut, Result<Self::Return, Error>> {
+        let repos = reporting.repos.clone();
 
-            let nuisance_type = {
-                let querier = self.querier.acquire().await?;
-                self.repos.insert_nuisance_type(querier, new).await?
-            };
+        Box::pin(async move { repos.execute(FetchNuisanceFamilies::all()).await })
+    }
+}
 
-            Ok(nuisance_type)
+pub struct CreateNuisanceFamily {
+    pub form: CreateNuisanceFamilyForm,
+    pub session: Session,
+}
+
+impl ReportingOp for CreateNuisanceFamily {
+    type Return = NuisanceFamilyId;
+
+    fn execute<'fut>(
+        self,
+        reporting: &mut ReportingActor,
+    ) -> LocalBoxFuture<'fut, Result<Self::Return, Error>> {
+        let repos = reporting.repos.clone();
+
+        Box::pin(async move {
+            let mut validator = Validator::default();
+            self.form.assert(&mut validator);
+            validator.check()?;
+
+            let nuisance_family_id = repos
+                .execute(InsertNuisanceFamily {
+                    label: self.form.label,
+                    description: self.form.description,
+                })
+                .await?;
+
+            Ok(nuisance_family_id)
         })
     }
 }

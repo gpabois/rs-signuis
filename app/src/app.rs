@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -23,9 +21,10 @@ pub fn App() -> impl IntoView {
 
         // content for this welcome page
         <Router>
-            <main>
+            <main class="bg-slate-300 min-h-screen w-full">
                 <Routes>
-                    <Route path="" view=pages::HomePage/>
+                    <Route path="/" view=pages::HomePage/>
+                    <Route path="/login" view=pages::LoginPage />
                     <Route path="/*any" view=NotFound/>
                 </Routes>
             </main>

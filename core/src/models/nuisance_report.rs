@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sql_gis::{sql_types::PgGeometry, types::Point};
+use sql_gis::types::Point;
 use uuid::Uuid;
 
 use super::nuisance_type::NuisanceType;

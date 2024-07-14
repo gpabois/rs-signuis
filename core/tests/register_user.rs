@@ -11,7 +11,7 @@ async fn register_user_with_valid_values() -> Result<(), signuis_core::Error> {
                 name: "UserName".into(),
                 email: "user@local.lan".into(),
                 password: "1234".into(),
-                confirm_password: "1234".into()
+                confirm_password: "1234".into(),
             };
 
             let actor = fixtures::sessions::new_anonymous_session();
@@ -20,20 +20,24 @@ async fn register_user_with_valid_values() -> Result<(), signuis_core::Error> {
 
             Ok(())
         })
-    }).await
-}   
+    })
+    .await
+}
 
 #[tokio::test]
 async fn register_user_with_existing_email() -> Result<(), signuis_core::Error> {
     setup::with_service(|tx| {
         Box::pin(async {
-            fixtures::users::UserFixture::new().with_email("test@local.lan").into_entity(tx).await?;
+            fixtures::users::UserFixture::new()
+                .with_email("test@local.lan")
+                .into_entity(tx)
+                .await?;
 
             let args = RegisterUser {
                 name: "UserName".into(),
                 email: "test@local.lan".into(),
                 password: "1234".into(),
-                confirm_password: "1234".into()
+                confirm_password: "1234".into(),
             };
 
             let actor = fixtures::sessions::new_anonymous_session();
@@ -43,21 +47,24 @@ async fn register_user_with_existing_email() -> Result<(), signuis_core::Error> 
 
             Ok(())
         })
-    }).await
-}  
-
+    })
+    .await
+}
 
 #[tokio::test]
 async fn register_user_with_existing_name() -> Result<(), signuis_core::Error> {
     setup::with_service(|tx| {
         Box::pin(async {
-            fixtures::users::UserFixture::new().with_name("UserName").into_entity(tx).await?;
+            fixtures::users::UserFixture::new()
+                .with_name("UserName")
+                .into_entity(tx)
+                .await?;
 
             let args = RegisterUser {
                 name: "UserName".into(),
                 email: "test@local.lan".into(),
                 password: "1234".into(),
-                confirm_password: "1234".into()
+                confirm_password: "1234".into(),
             };
 
             let actor = fixtures::sessions::new_anonymous_session();
@@ -67,8 +74,9 @@ async fn register_user_with_existing_name() -> Result<(), signuis_core::Error> {
 
             Ok(())
         })
-    }).await
-}  
+    })
+    .await
+}
 
 #[tokio::test]
 async fn register_user_with_invalid_password() -> Result<(), signuis_core::Error> {
@@ -78,7 +86,7 @@ async fn register_user_with_invalid_password() -> Result<(), signuis_core::Error
                 name: "UserName".into(),
                 email: "test@local.lan".into(),
                 password: "1234".into(),
-                confirm_password: "12345".into()
+                confirm_password: "12345".into(),
             };
 
             let actor = fixtures::sessions::new_anonymous_session();
@@ -88,9 +96,9 @@ async fn register_user_with_invalid_password() -> Result<(), signuis_core::Error
 
             Ok(())
         })
-    }).await
-}   
-
+    })
+    .await
+}
 
 #[tokio::test]
 async fn register_user_with_invalid_email() -> Result<(), signuis_core::Error> {
@@ -100,7 +108,7 @@ async fn register_user_with_invalid_email() -> Result<(), signuis_core::Error> {
                 name: "UserName".into(),
                 email: "invalid_email".into(),
                 password: "1234".into(),
-                confirm_password: "1234".into()
+                confirm_password: "1234".into(),
             };
 
             let actor = fixtures::sessions::new_anonymous_session();
@@ -110,5 +118,7 @@ async fn register_user_with_invalid_email() -> Result<(), signuis_core::Error> {
 
             Ok(())
         })
-    }).await
-}   
+    })
+    .await
+}
+

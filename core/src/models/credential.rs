@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::error::Error;
 
-#[derive(sqlx::FromRow)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 /// Identifiants stockés en BDD.
 pub struct Credential {
     /// Identifiant du compte associé.
@@ -14,12 +14,11 @@ pub struct Credential {
 
 impl Credential {
     /// Vérifie les identifiants par rapport à une soumission.
-    pub fn verify_against(&self, password: &str) -> Result<(), Error> {
-        let pwd_hash =
-            PasswordHash::new(&self.password).map_err(|source| Error::internal_error(source))?;
+    pub fn verify(&self, password: &str) -> Result<bool, Error> {
+        let pwd_hash = PasswordHash::new(&self.password).map_err(|_| Error::internal_error())?;
 
-        pwd_hash
+        Ok(pwd_hash
             .verify_password(&[&argon2::Argon2::default()], password)
-            .map_err(|_| Error::invalid_credential())
+            .is_ok())
     }
 }

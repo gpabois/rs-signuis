@@ -1,35 +1,33 @@
-use actix::{Handler, Message, ResponseFuture};
-use sqlx::Executor;
-
 use crate::error::Error;
 use crate::models::credential::Credential;
 
-use super::Repository;
+use super::RepositoryOp;
 
 pub struct MaybeFindOneCredentialByNameOrEmail(pub String);
 
-impl Message for MaybeFindOneCredentialByNameOrEmail {
-    type Result = Result<Option<Credential>, Error>;
-}
+impl RepositoryOp for MaybeFindOneCredentialByNameOrEmail {
+    type Return = Option<Credential>;
 
-impl Handler<MaybeFindOneCredentialByNameOrEmail> for Repository {
-    type Result = ResponseFuture<Result<Option<Credential>, crate::error::Error>>;
+    fn execute<'c, E>(
+        self,
+        executor: E,
+    ) -> futures::prelude::future::LocalBoxFuture<'c, Result<Self::Return, Error>>
+    where
+        E: sqlx::prelude::Executor<'c, Database = sqlx::Postgres> + 'c,
+    {
+        Box::pin(async move {
+            let credential: Option<Credential> = sqlx::query_as(
+                r#"
+                SELECT id, password 
+                FROM users 
+                WHERE username=$1 OR WHERE email=$1
+            "#,
+            )
+            .bind(self.0)
+            .fetch_optional(executor)
+            .await?;
 
-    fn handle(
-        &mut self,
-        msg: MaybeFindOneCredentialByNameOrEmail,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        Box::pin(async {
-            let conn: sqlx::pool::PoolConnection<sqlx::Postgres> = self.pool.acquire().await?;
-
-            let cred: Credential =
-                sqlx::query("SELECT id, password FROM users WHERE username=$1 OR WHERE email=$1")
-                    .bind(msg.0)
-                    .fetch_optional(conn)
-                    .await?;
-
-            Ok(cred)
+            Ok(credential)
         })
     }
 }

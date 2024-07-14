@@ -1,15 +1,27 @@
-use signuis_core::fixtures::{self};
-use signuis_core::services::reporting::traits::Reporting;
+use std::error::Error;
+
+use signuis_core::{
+    forms::reporting::CreateNuisanceFamilyForm,
+    models::{nuisance_family::CreateNuisanceFamily, session::Session},
+};
+
 mod setup;
 
 #[tokio::test]
-async fn create_nuisance_family_with_valid_values() -> Result<(), signuis_core::Error> {
-    setup::with_service(|tx| {
-        Box::pin(async {
-            let args = fixtures::nuisance_families::NuisanceFamilyFixture::new();
-            let actor = fixtures::sessions::new_anonymous_session();
-            tx.create_nuisance_family(args, &actor).await?;
-            Ok(())
+async fn create_nuisance_family_with_valid_values() -> Result<(), Box<dyn Error>> {
+    let sg = setup::setup().await?;
+
+    let nuisance_family = sg
+        .reporting
+        .execute(CreateNuisanceFamily {
+            form: CreateNuisanceFamilyForm {
+                label: "nuisance_type".to_owned(),
+                description: "this is a nuisance family".to_owned(),
+            },
+            session: Session::Anonymous,
         })
-    }).await
-}   
+        .await?;
+
+    Ok(())
+}
+

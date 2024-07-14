@@ -1,5 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::validation::{Validation, Validator};
 
+#[derive(Deserialize, Serialize)]
 /// Objet pour enregistrer un nouvel utilisateur.
 pub struct RegisterUserForm {
     pub username: String,
@@ -27,7 +30,7 @@ impl Validation for RegisterUserForm {
             ["password"],
         );
         validator.assert_not_empty(
-            &self.name,
+            &self.username,
             Some("le nom d'utilisateur ne doit pas être vide"),
             ["username"],
         );
