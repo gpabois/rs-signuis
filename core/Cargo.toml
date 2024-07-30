@@ -21,14 +21,14 @@ dotenv = { version = "0.15.0", optional = true }
 log = "0.4.20"
 password-hash = { version = "0.5.0", optional = true }
 rand = { version = "0.8.5", optional = true }
-sqlx = { version = "0.7.3", features = [
+sqlx = { version = "^0.8.0", features = [
   "postgres",
   "runtime-tokio",
   "uuid",
   "chrono",
 ], optional = true }
 futures = { version = "0.3.30", optional = true }
-sqlx-postgres = { version = "0.7.3", optional = true }
+sqlx-postgres = { version = "^0.8.0", optional = true }
 tokio = { version = "1.35.0", features = [
   "test-util",
   "rt",
@@ -37,6 +37,7 @@ tokio = { version = "1.35.0", features = [
 email_address = "0.2.4"
 serde_json = "^1.0.108"
 serde = "1.0.194"
+sql-builder = { git = "https://github.com/gpabois/sql-builder.git", default-features = false, optional = true }
 sql-gis = { git = "https://github.com/gpabois/sql-gis.git", default-features = false, optional = true }
 actix = { version = "0.13.5", optional = true }
 paste = "1.0.15"
@@ -56,6 +57,7 @@ backend = [
   "actix",
   "sql-gis/postgis",
   "sql-gis/geojson",
+  "sql-builder",
   "rand",
   "argon2",
   "dotenv",

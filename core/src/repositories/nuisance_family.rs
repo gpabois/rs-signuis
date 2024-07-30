@@ -4,8 +4,9 @@ use crate::{
     models::nuisance_family::{NuisanceFamily, NuisanceFamilyId},
 };
 
-const INSERT_NUISANCE_FAMILY_SQL: &str =
-    "INSERT INTO nuisance_families (label, description) VALUES ($1, $2) RETURNING id";
+use sql_builder::{bind, columns, id, insert, prelude::*, row_value, select, select_columns};
+
+const TABLE: sql_builder::identifier::IdentifierRef<'static> = id!(nuisance_families);
 
 pub struct InsertNuisanceFamily {
     pub label: String,
@@ -23,9 +24,12 @@ impl RepositoryOp for InsertNuisanceFamily {
         E: sqlx::prelude::Executor<'c, Database = sqlx::Postgres> + 'c,
     {
         Box::pin(async move {
-            let (id,): (NuisanceFamilyId,) = sqlx::query_as(INSERT_NUISANCE_FAMILY_SQL)
-                .bind(self.label)
-                .bind(self.description)
+            let (sql, args) = insert(TABLE)
+                .columns(columns!(id!(label), id!(description)))
+                .values(row_value!(bind!(&self.label), bind!(&self.description)))
+                .build::<::sqlx::Postgres>();
+
+            ::sqlx::query_as_with(&sql, args)
                 .fetch_one(executor)
                 .await?;
 
@@ -77,6 +81,10 @@ impl RepositoryOp for FetchNuisanceFamilies {
         E: sqlx::prelude::Executor<'c, Database = sqlx::Postgres> + 'c,
     {
         Box::pin(async move {
+            let (sql, _) = select(select_columns!(id!(id), id!(label), id!(description)))
+                .from(TABLE)
+                .build::<sqlx::Postgres>();
+
             let nuisance_families =
                 sqlx::query_as("SELECT id, label, description FROM nuisance_families")
                     .fetch_all(executor)

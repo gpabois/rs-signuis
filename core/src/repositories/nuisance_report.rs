@@ -1,3 +1,4 @@
+use sql_builder::{bind, columns, id, insert, prelude::*, row_value};
 use sql_gis::sql_types::PgPoint;
 use uuid::Uuid;
 
@@ -23,21 +24,26 @@ impl RepositoryOp for InsertNuisanceReport {
         E: sqlx::prelude::Executor<'c, Database = sqlx::Postgres> + 'c,
     {
         Box::pin(async move {
-            let (id,): (NuisanceReportId,) = sqlx::query_as(INSERT_NUISANCE_QUERY)
-                .bind(self.type_id)
-                .bind(self.location)
-                .bind(self.intensity)
-                .bind(self.user_id)
-                .fetch_one(executor)
-                .await?;
+            let (sql, args) = insert(TABLE)
+                .columns(columns!(
+                    id!(type_id),
+                    id!(location),
+                    id!(intensity),
+                    id!(user_id)
+                ))
+                .values(row_value!(
+                    bind!(self.type_id),
+                    bind!(self.location),
+                    bind!(self.intensity),
+                    bind!(self.user_id)
+                ))
+                .build::<::sqlx::Postgres>();
+
+            let (id,) = sqlx::query_as_with(&sql, args).fetch_one(executor).await?;
 
             Ok(id)
         })
     }
 }
 
-const INSERT_NUISANCE_QUERY: &str = r#"
-    INSERT INTO nuisance_reports (type_id, location, intensity, user_id) 
-        VALUES ($1, $2, $3, $4) 
-    RETURNING id
-"#;
+const TABLE: sql_builder::identifier::IdentifierRef<'static> = id!(nuisance_reports);

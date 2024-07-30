@@ -1,5 +1,6 @@
 use actix::Message;
 use argon2::Argon2;
+use sql_builder::{bind, columns, id, insert, row_value, Symbol};
 use sqlx::{prelude::Type, Decode, Encode, Executor, Postgres};
 
 use crate::{
@@ -104,15 +105,22 @@ impl RepositoryOp for InsertUser {
         Box::pin(async move {
             self.hash_password()?;
 
-            let (id,): (UserId,) = sqlx::query_as(
-                "INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id",
-            )
-            .bind(self.username)
-            .bind(self.email)
-            .bind(self.password)
-            .bind(self.role)
-            .fetch_one(executor)
-            .await?;
+            let (sql, args) = insert(TABLE)
+                .columns(columns!(
+                    id!(username),
+                    id!(email),
+                    id!(password),
+                    id!(role)
+                ))
+                .values(row_value!(
+                    bind!(&self.username),
+                    bind!(&self.email),
+                    bind!(&self.password),
+                    bind!(&self.role)
+                ))
+                .build::<sqlx::Postgres>();
+
+            let (id,): (UserId,) = sqlx::query_as_with(&sql, args).fetch_one(executor).await?;
 
             Ok(id)
         })
@@ -142,6 +150,8 @@ impl InsertUser {
         Ok(())
     }
 }
+
+const TABLE: sql_builder::identifier::IdentifierRef<'_> = id!(users);
 
 #[cfg(any(test, feature = "fixture"))]
 pub mod fixtures {

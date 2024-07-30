@@ -1,3 +1,4 @@
+use sql_builder::{bind, columns, id, insert, prelude::*, row_value, select, select_columns};
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -17,6 +18,8 @@ const NUISANCE_TYPE_EXISTS_QUERY: &str = r#"
     )
 "#;
 
+const TABLE: sql_builder::identifier::IdentifierRef<'static> = id!(nuisance_types);
+
 pub struct InsertNuisanceType {
     pub label: String,
     pub description: String,
@@ -34,12 +37,17 @@ impl RepositoryOp for InsertNuisanceType {
         E: sqlx::prelude::Executor<'c, Database = sqlx::Postgres> + 'c,
     {
         Box::pin(async move {
-            let (id,): (NuisanceTypeId,) = sqlx::query_as(INSERT_NUISANCE_TYPE_QUERY)
-                .bind(self.label)
-                .bind(self.description)
-                .bind(self.family_id)
-                .fetch_one(executor)
-                .await?;
+            let (sql, args) = insert(TABLE)
+                .columns(columns!(id!(label), id!(description), id!(family_id)))
+                .values(row_value!(
+                    bind!(&self.label),
+                    bind!(&self.description),
+                    bind!(&self.family_id)
+                ))
+                .build::<sqlx::Postgres>();
+
+            let (id,): (NuisanceTypeId,) =
+                sqlx::query_as_with(&sql, args).fetch_one(executor).await?;
 
             Ok(id)
         })
